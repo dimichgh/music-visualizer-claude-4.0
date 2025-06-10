@@ -133,6 +133,19 @@ export class CosmicEffectsManager {
     const intensity = this.config.intensity;
     const responsiveness = this.config.responsiveness;
 
+    // Log intensity application every 2 seconds for verification
+    if (this.frameCount % 120 === 0) {
+      const activeEffects = {
+        nebulae: this.config.nebulaeEnabled ? 1 : 0,
+        portals: this.energyPortals.filter(p => p.isActive()).length,
+        plasma: this.plasmaWaves.filter(p => p.isActive()).length,
+        gravity: this.gravitationalLenses.filter(l => l.isActive()).length
+      };
+      
+      console.log(`🎚️ Effects Update - Intensity: ${(intensity * 100).toFixed(0)}%, Responsiveness: ${(responsiveness * 100).toFixed(0)}%`);
+      console.log(`📊 Active Effects:`, activeEffects);
+    }
+
     // Update Nebulae System - responds to bass and overall energy
     if (this.config.nebulaeEnabled && this.nebulaeSystem) {
       const nebulaeIntensity = audioData.bassLevel * 0.7 + audioData.overallLevel * 0.3;
@@ -175,12 +188,15 @@ export class CosmicEffectsManager {
 
     // Beat Detection - Trigger Energy Portals
     if (audioData.beatDetected && this.config.portalsEnabled) {
+      console.log(`🌀 Beat detected! Triggering Energy Portal (intensity: ${(this.config.intensity * 100).toFixed(0)}%)`);
       this.triggerEnergyPortal(audioData);
     }
 
     // High-frequency spikes - Trigger Plasma Waves
     if (audioData.trebleLevel > 0.7 && this.config.plasmaEnabled) {
-      if (Math.random() < audioData.trebleLevel * responsiveness * 0.3) {
+      const triggerChance = audioData.trebleLevel * responsiveness * 0.3;
+      if (Math.random() < triggerChance) {
+        console.log(`⚡ High treble detected! Triggering Plasma Wave (chance: ${(triggerChance * 100).toFixed(1)}%, responsiveness: ${(responsiveness * 100).toFixed(0)}%)`);
         this.triggerPlasmaWave(audioData);
       }
     }
@@ -188,7 +204,9 @@ export class CosmicEffectsManager {
     // Dramatic moments - Trigger Gravitational Lensing
     const energyGradient = this.calculateEnergyGradient();
     if (energyGradient > 0.5 && audioData.overallLevel > 0.6 && this.config.gravityEnabled) {
-      if (Math.random() < energyGradient * responsiveness * 0.2) {
+      const triggerChance = energyGradient * responsiveness * 0.2;
+      if (Math.random() < triggerChance) {
+        console.log(`🕳️ Energy surge detected! Triggering Gravitational Lens (gradient: ${energyGradient.toFixed(2)}, chance: ${(triggerChance * 100).toFixed(1)}%)`);
         this.triggerGravitationalLens(audioData);
       }
     }
@@ -299,8 +317,64 @@ export class CosmicEffectsManager {
   }
 
   public updateConfiguration(newConfig: Partial<CosmicEffectsConfig>): void {
+    const oldConfig = { ...this.config };
     this.config = { ...this.config, ...newConfig };
-    console.log('CosmicEffectsManager: Configuration updated', this.config);
+    
+    console.log('CosmicEffectsManager: Configuration updated');
+    console.log('Previous:', oldConfig);
+    console.log('New:', this.config);
+    
+    // Immediate feedback for disabled effects
+    if (!this.config.nebulaeEnabled && oldConfig.nebulaeEnabled) {
+      console.log('🌫️ Nebulae systems disabled');
+    } else if (this.config.nebulaeEnabled && !oldConfig.nebulaeEnabled) {
+      console.log('🌫️ Nebulae systems enabled');
+    }
+    
+    if (!this.config.portalsEnabled && oldConfig.portalsEnabled) {
+      console.log('🌀 Energy portals disabled');
+      // Hide all active portals
+      this.energyPortals.forEach(portal => {
+        if (portal.isActive()) {
+          portal.setVisible(false);
+        }
+      });
+    } else if (this.config.portalsEnabled && !oldConfig.portalsEnabled) {
+      console.log('🌀 Energy portals enabled');
+    }
+    
+    if (!this.config.plasmaEnabled && oldConfig.plasmaEnabled) {
+      console.log('⚡ Plasma waves disabled');
+      // Hide all active plasma waves
+      this.plasmaWaves.forEach(plasma => {
+        if (plasma.isActive()) {
+          plasma.setVisible(false);
+        }
+      });
+    } else if (this.config.plasmaEnabled && !oldConfig.plasmaEnabled) {
+      console.log('⚡ Plasma waves enabled');
+    }
+    
+    if (!this.config.gravityEnabled && oldConfig.gravityEnabled) {
+      console.log('🕳️ Gravitational lenses disabled');
+      // Hide all active gravity lenses
+      this.gravitationalLenses.forEach(lens => {
+        if (lens.isActive()) {
+          lens.setVisible(false);
+        }
+      });
+    } else if (this.config.gravityEnabled && !oldConfig.gravityEnabled) {
+      console.log('🕳️ Gravitational lenses enabled');
+    }
+    
+    // Log intensity and responsiveness changes
+    if (Math.abs(this.config.intensity - oldConfig.intensity) > 0.05) {
+      console.log(`🎚️ Intensity changed: ${(oldConfig.intensity * 100).toFixed(0)}% → ${(this.config.intensity * 100).toFixed(0)}%`);
+    }
+    
+    if (Math.abs(this.config.responsiveness - oldConfig.responsiveness) > 0.05) {
+      console.log(`🎯 Responsiveness changed: ${(oldConfig.responsiveness * 100).toFixed(0)}% → ${(this.config.responsiveness * 100).toFixed(0)}%`);
+    }
   }
 
   public getPerformanceInfo() {
@@ -311,6 +385,58 @@ export class CosmicEffectsManager {
       activeGravity: this.gravitationalLenses.filter(l => l.isActive()).length,
       nebulaeParticles: this.nebulaeSystem ? this.nebulaeSystem.getParticleCount() : 0
     };
+  }
+
+  public getCurrentConfig(): CosmicEffectsConfig {
+    return { ...this.config };
+  }
+
+  public triggerTestEffect(effectType: string): void {
+    console.log(`🧪 Testing ${effectType} effect...`);
+    
+    const testAudioData: AudioData = {
+      bassLevel: 0.8,
+      midLevel: 0.7,
+      trebleLevel: 0.9,
+      overallLevel: 0.8,
+      beatDetected: true,
+      tempo: 120,
+      dominantFrequency: 440
+    };
+
+    switch (effectType) {
+      case 'portal':
+        if (this.config.portalsEnabled) {
+          this.triggerEnergyPortal(testAudioData);
+        } else {
+          console.log('❌ Portals are disabled');
+        }
+        break;
+      case 'plasma':
+        if (this.config.plasmaEnabled) {
+          this.triggerPlasmaWave(testAudioData);
+        } else {
+          console.log('❌ Plasma waves are disabled');
+        }
+        break;
+      case 'gravity':
+        if (this.config.gravityEnabled) {
+          this.triggerGravitationalLens(testAudioData);
+        } else {
+          console.log('❌ Gravitational lenses are disabled');
+        }
+        break;
+      case 'nebulae':
+        if (this.config.nebulaeEnabled && this.nebulaeSystem) {
+          this.nebulaeSystem.triggerColorShift(0.8);
+          console.log('🌫️ Triggered nebulae color shift');
+        } else {
+          console.log('❌ Nebulae systems are disabled');
+        }
+        break;
+      default:
+        console.log('❓ Unknown effect type:', effectType);
+    }
   }
 
   public cleanup(): void {

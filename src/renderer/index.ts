@@ -402,8 +402,8 @@ class MusicVisualizerRenderer {
     cosmicEffectsEl.id = 'cosmic-effects-panel';
     cosmicEffectsEl.style.cssText = `
       position: fixed;
-      top: 20px;
-      left: 20px;
+      bottom: 20px;
+      right: 20px;
       z-index: 1000;
       background: rgba(20, 25, 40, 0.95);
       backdrop-filter: blur(10px);
@@ -467,6 +467,21 @@ class MusicVisualizerRenderer {
             accent-color: #06b6d4;
           ">
           <span id="responsiveness-display" style="color: #94a3b8; font-size: 10px; min-width: 30px;">70%</span>
+        </div>
+      </div>
+      <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(100, 120, 200, 0.2);">
+        <h5 style="margin: 0 0 8px 0; color: #94a3b8; font-size: 10px;">📊 Effects Status</h5>
+        <div id="cosmic-effects-status" style="font-size: 9px; line-height: 1.3; color: #6b7280;">
+          No audio data available
+        </div>
+      </div>
+      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(100, 120, 200, 0.2);">
+        <h5 style="margin: 0 0 8px 0; color: #94a3b8; font-size: 10px;">🧪 Test Effects</h5>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px;">
+          <button id="test-portal" style="padding: 4px; border: none; border-radius: 4px; background: #06b6d4; color: white; cursor: pointer; font-size: 9px;">Portal</button>
+          <button id="test-plasma" style="padding: 4px; border: none; border-radius: 4px; background: #10b981; color: white; cursor: pointer; font-size: 9px;">Plasma</button>
+          <button id="test-gravity" style="padding: 4px; border: none; border-radius: 4px; background: #f59e0b; color: white; cursor: pointer; font-size: 9px;">Gravity</button>
+          <button id="test-nebulae" style="padding: 4px; border: none; border-radius: 4px; background: #8b5cf6; color: white; cursor: pointer; font-size: 9px;">Nebulae</button>
         </div>
       </div>
     `;
@@ -1028,8 +1043,45 @@ class MusicVisualizerRenderer {
       `;
     }
 
+    // Update cosmic effects status display
+    this.updateCosmicEffectsStatus(analysisResult?.features);
+
     // Fallback frequency visualization if 3D failed
     this.updateFrequencyDisplay(analysisResult?.frequencyData);
+  }
+
+  private updateCosmicEffectsStatus(features: any): void {
+    const statusElement = document.getElementById('cosmic-effects-status');
+    if (!statusElement || !this.visualizer) return;
+
+    const cosmicEffects = (this.visualizer as any).getCosmicEffects?.();
+    if (!cosmicEffects) {
+      statusElement.innerHTML = 'Cosmic effects not initialized';
+      return;
+    }
+
+    const performanceInfo = cosmicEffects.getPerformanceInfo();
+    const config = cosmicEffects.getCurrentConfig();
+
+    if (!config || !performanceInfo) {
+      statusElement.innerHTML = 'Status unavailable';
+      return;
+    }
+
+    const statusLines = [
+      `🎚️ Int: ${(config.intensity * 100).toFixed(0)}% | Resp: ${(config.responsiveness * 100).toFixed(0)}%`,
+      `🌫️ Nebulae: ${config.nebulaeEnabled ? '✅' : '❌'} (${performanceInfo.nebulaeParticles} particles)`,
+      `🌀 Portals: ${config.portalsEnabled ? '✅' : '❌'} (${performanceInfo.activePortals} active)`,
+      `⚡ Plasma: ${config.plasmaEnabled ? '✅' : '❌'} (${performanceInfo.activePlasma} active)`,
+      `🕳️ Gravity: ${config.gravityEnabled ? '✅' : '❌'} (${performanceInfo.activeGravity} active)`
+    ];
+
+    // Add performance indicator
+    const fpsColor = performanceInfo.avgFPS > 50 ? '#10b981' : 
+                     performanceInfo.avgFPS > 30 ? '#f59e0b' : '#ef4444';
+    statusLines.push(`<span style="color: ${fpsColor};">⚡ ${performanceInfo.avgFPS} FPS</span>`);
+
+    statusElement.innerHTML = statusLines.join('<br>');
   }
 
   private updateFrequencyDisplay(frequencyData: any): void {
@@ -1313,6 +1365,48 @@ class MusicVisualizerRenderer {
       updateCosmicConfig();
     });
 
+    // Test effect buttons
+    const testPortal = document.getElementById('test-portal');
+    const testPlasma = document.getElementById('test-plasma');
+    const testGravity = document.getElementById('test-gravity');
+    const testNebulae = document.getElementById('test-nebulae');
+
+    testPortal?.addEventListener('click', () => {
+      if (this.visualizer) {
+        const cosmicEffects = (this.visualizer as any).getCosmicEffects?.();
+        if (cosmicEffects) {
+          cosmicEffects.triggerTestEffect('portal');
+        }
+      }
+    });
+
+    testPlasma?.addEventListener('click', () => {
+      if (this.visualizer) {
+        const cosmicEffects = (this.visualizer as any).getCosmicEffects?.();
+        if (cosmicEffects) {
+          cosmicEffects.triggerTestEffect('plasma');
+        }
+      }
+    });
+
+    testGravity?.addEventListener('click', () => {
+      if (this.visualizer) {
+        const cosmicEffects = (this.visualizer as any).getCosmicEffects?.();
+        if (cosmicEffects) {
+          cosmicEffects.triggerTestEffect('gravity');
+        }
+      }
+    });
+
+    testNebulae?.addEventListener('click', () => {
+      if (this.visualizer) {
+        const cosmicEffects = (this.visualizer as any).getCosmicEffects?.();
+        if (cosmicEffects) {
+          cosmicEffects.triggerTestEffect('nebulae');
+        }
+      }
+    });
+
     console.log('Cosmic effects controls setup complete');
   }
 
@@ -1339,7 +1433,7 @@ class MusicVisualizerRenderer {
       {
         id: 'cosmic-effects-panel',
         pinButtonId: 'cosmic-effects-pin',
-        triggerArea: { left: 0, top: 0, width: 320, height: 400 }
+        triggerArea: { right: 0, bottom: 0, width: 320, height: 450 }
       }
     ];
 
@@ -1383,7 +1477,7 @@ class MusicVisualizerRenderer {
             if (panelId === 'features-display') {
               panel.style.transform = 'translateY(-20px) translateX(20px)';
             } else if (panelId === 'cosmic-effects-panel') {
-              panel.style.transform = 'translateY(-20px) translateX(-20px)';
+              panel.style.transform = 'translateY(20px) translateX(20px)';
             } else {
               panel.style.transform = 'translateY(20px)';
             }
