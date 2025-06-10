@@ -1,11 +1,13 @@
 import * as THREE from 'three';
 import { SceneManager } from './scene-manager';
 import { ParticleSystem } from './particle-system';
-import { GraphicsConfig, ParticleSystemConfig } from '@shared/types';
+import { CosmicEffectsManager, AudioData } from './cosmic-effects/CosmicEffectsManager';
+import { GraphicsConfig, ParticleSystemConfig } from '@shared/types/visualizer';
 
 export class MusicVisualizer {
   private sceneManager!: SceneManager;
   private particleSystems: ParticleSystem[] = [];
+  private cosmicEffects!: CosmicEffectsManager;
   private audioFeatures: any = null;
   private isInitialized = false;
 
@@ -20,6 +22,7 @@ export class MusicVisualizer {
 
     this.sceneManager = new SceneManager(container, config);
     this.initializeVisualizations();
+    this.initializeCosmicEffects();
     this.setupRenderLoop();
     this.isInitialized = true;
   }
@@ -68,6 +71,15 @@ export class MusicVisualizer {
     this.createStarField();
   }
 
+  private initializeCosmicEffects(): void {
+    // Initialize the cosmic effects manager with scene and camera
+    const scene = this.sceneManager.getScene();
+    const camera = this.sceneManager.getCamera();
+    this.cosmicEffects = new CosmicEffectsManager(scene, camera);
+    
+    console.log('Cosmic effects system initialized!');
+  }
+
   private createStarField(): void {
     const starGeometry = new THREE.BufferGeometry();
     const starCount = 800;
@@ -104,6 +116,12 @@ export class MusicVisualizer {
       system.update(deltaTime, this.audioFeatures);
     });
 
+    // Update cosmic effects with audio data
+    if (this.audioFeatures && this.cosmicEffects) {
+      const audioData: AudioData = this.convertToAudioData(this.audioFeatures);
+      this.cosmicEffects.updateAudioFeatures(audioData);
+    }
+
     // Camera movement based on audio
     if (this.audioFeatures) {
       const camera = this.sceneManager.getCamera();
@@ -123,6 +141,24 @@ export class MusicVisualizer {
     }
   }
 
+  private convertToAudioData(audioFeatures: any): AudioData {
+    return {
+      bassLevel: audioFeatures.bassLevel || 0,
+      midLevel: audioFeatures.midLevel || 0,
+      trebleLevel: audioFeatures.trebleLevel || 0,
+      overallLevel: audioFeatures.overallLevel || 0,
+      beatDetected: audioFeatures.beatDetected || false,
+      tempo: audioFeatures.tempo || 120,
+      dominantFrequency: audioFeatures.dominantFrequency || 440,
+      
+      // Extended features if available
+      spectralCentroid: audioFeatures.spectralCentroid,
+      spectralRolloff: audioFeatures.spectralRolloff,
+      spectralFlux: audioFeatures.spectralFlux,
+      instrumentDetection: audioFeatures.instrumentDetection
+    };
+  }
+
   public updateAudioFeatures(audioFeatures: any): void {
     this.audioFeatures = audioFeatures;
   }
@@ -139,6 +175,9 @@ export class MusicVisualizer {
 
   public dispose(): void {
     this.particleSystems.forEach(system => system.dispose());
+    if (this.cosmicEffects) {
+      this.cosmicEffects.cleanup();
+    }
     this.sceneManager.dispose();
   }
 } 
