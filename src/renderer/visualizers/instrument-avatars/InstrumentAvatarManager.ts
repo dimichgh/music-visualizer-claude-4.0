@@ -58,10 +58,20 @@ export class InstrumentAvatarManager {
   // Avatar instances
   private avatars: Map<string, BaseAvatar> = new Map();
   
-  // Positioning system
+  // Enhanced positioning system
   private centerPosition = new THREE.Vector3(0, 0, 0);
-  private orbitRadius = 12; // Base orbital distance
+  private orbitRadius = 18; // Increased base orbital distance for better separation
   private currentTime = 0;
+  
+  // Instrument-specific positioning data
+  private instrumentPositions = {
+    drums: { heightLevel: -2, radiusMultiplier: 1.2, rotationOffset: 0 },
+    bass: { heightLevel: -1, radiusMultiplier: 1.1, rotationOffset: Math.PI / 3 },
+    guitar: { heightLevel: 0, radiusMultiplier: 1.0, rotationOffset: Math.PI / 6 },
+    vocals: { heightLevel: 2, radiusMultiplier: 0.9, rotationOffset: Math.PI / 2 },
+    piano: { heightLevel: 1, radiusMultiplier: 1.05, rotationOffset: Math.PI * 2 / 3 },
+    strings: { heightLevel: 0.5, radiusMultiplier: 0.95, rotationOffset: Math.PI * 5 / 6 }
+  };
   
   // Performance tracking
   private frameCount = 0;
@@ -104,23 +114,35 @@ export class InstrumentAvatarManager {
   }
 
   private positionAvatars(): void {
-    const avatarNames = Array.from(this.avatars.keys());
-    const angleStep = (Math.PI * 2) / avatarNames.length;
-
-    avatarNames.forEach((name, index) => {
-      const avatar = this.avatars.get(name)!;
-      const angle = index * angleStep;
+    console.log('🎭 Positioning avatars with enhanced 3D separation...');
+    
+    this.avatars.forEach((avatar, name) => {
+      const posData = this.instrumentPositions[name as keyof typeof this.instrumentPositions];
       
-      // Base position in circular arrangement
-      const basePosition = new THREE.Vector3(
-        Math.cos(angle) * this.orbitRadius,
-        Math.sin(index * 0.3) * 2, // Slight vertical variation
-        Math.sin(angle) * this.orbitRadius
-      );
+      if (posData) {
+        // Calculate unique position for each instrument
+        const instrumentRadius = this.orbitRadius * posData.radiusMultiplier;
+        const height = posData.heightLevel * 3; // 3 units per level for clear separation
+        const angle = posData.rotationOffset;
+        
+        const basePosition = new THREE.Vector3(
+          Math.cos(angle) * instrumentRadius,
+          height,
+          Math.sin(angle) * instrumentRadius
+        );
 
-      avatar.setBasePosition(basePosition);
-      avatar.setOrbitalAngle(angle);
+        avatar.setBasePosition(basePosition);
+        avatar.setOrbitalAngle(angle);
+        
+        console.log(`🎭 ${name.toUpperCase()} positioned at:`, {
+          radius: instrumentRadius.toFixed(1),
+          height: height.toFixed(1),
+          angle: (angle * 180 / Math.PI).toFixed(0) + '°'
+        });
+      }
     });
+    
+    console.log('🎭 All avatars positioned with no overlapping!');
   }
 
   public updateAudioFeatures(audioFeatures: AudioFeatures): void {
@@ -172,29 +194,84 @@ export class InstrumentAvatarManager {
   }
 
   private updateAvatarPositions(deltaTime: number): void {
-    // Update orbital motion for all avatars
+    const positions: Map<string, THREE.Vector3> = new Map();
+    
+    // First pass: calculate intended positions
     this.avatars.forEach((avatar, name) => {
       const avatarConfig = this.config.avatars[name as keyof typeof this.config.avatars];
       if (!avatarConfig.enabled) return;
 
-      // Calculate orbital motion
-      const movementSpeed = this.config.movementSpeed * avatarConfig.movementSpeed;
-      const newAngle = avatar.getOrbitalAngle() + (deltaTime * 0.001 * movementSpeed * 0.2);
+      const posData = this.instrumentPositions[name as keyof typeof this.instrumentPositions];
+      if (!posData) return;
+
+      // Calculate enhanced orbital motion with instrument-specific behavior
+      const baseMovementSpeed = this.config.movementSpeed * avatarConfig.movementSpeed;
+      const staggeredTime = this.currentTime + (posData.rotationOffset * 2); // Time offset for staggered motion
+      const movementSpeed = baseMovementSpeed * (0.8 + Math.sin(staggeredTime * 0.3) * 0.4); // Variable speed
+      
+      const newAngle = avatar.getOrbitalAngle() + (deltaTime * 0.001 * movementSpeed * 0.15);
       avatar.setOrbitalAngle(newAngle);
 
-      // Update position based on orbital motion and confidence
+      // Enhanced radius calculation with confidence and instrument-specific positioning
       const confidence = avatar.getCurrentConfidence();
-      const radiusModifier = 1.0 + (confidence - 0.5) * 0.3; // Move closer when more confident
-      const currentRadius = this.orbitRadius * radiusModifier;
+      const baseRadius = this.orbitRadius * posData.radiusMultiplier;
+      const confidenceModifier = 1.0 + (confidence - 0.5) * 0.2; // Subtle movement based on confidence
+      const breathingEffect = 1.0 + Math.sin(staggeredTime * 1.5) * 0.1; // Gentle breathing motion
+      const currentRadius = baseRadius * confidenceModifier * breathingEffect;
 
+      // Calculate 3D position with enhanced vertical movement
+      const height = posData.heightLevel * 3 + Math.sin(staggeredTime * 1.8 + newAngle) * 1.2; // Layered floating
+      
       const orbitalPosition = new THREE.Vector3(
         Math.cos(newAngle) * currentRadius,
-        avatar.getBasePosition().y + Math.sin(this.currentTime * 2 + newAngle) * 1.5, // Gentle vertical floating
+        height,
         Math.sin(newAngle) * currentRadius
       );
 
-      avatar.updatePosition(orbitalPosition);
+      positions.set(name, orbitalPosition);
     });
+
+    // Second pass: apply collision avoidance and update positions
+    this.avatars.forEach((avatar, name) => {
+      const intendedPosition = positions.get(name);
+      if (!intendedPosition) return;
+
+      // Check for potential collisions with other avatars
+      const finalPosition = this.applyCollisionAvoidance(name, intendedPosition, positions);
+      avatar.updatePosition(finalPosition);
+    });
+  }
+
+  private applyCollisionAvoidance(
+    currentName: string, 
+    intendedPosition: THREE.Vector3, 
+    allPositions: Map<string, THREE.Vector3>
+  ): THREE.Vector3 {
+    const minDistance = 8.0; // Minimum distance between avatars
+    const avoidanceForce = new THREE.Vector3();
+    let needsAdjustment = false;
+
+    // Check distance to all other avatars
+    allPositions.forEach((otherPosition, otherName) => {
+      if (otherName === currentName) return;
+
+      const distance = intendedPosition.distanceTo(otherPosition);
+      if (distance < minDistance) {
+        // Calculate repulsion vector
+        const repulsion = intendedPosition.clone().sub(otherPosition).normalize();
+        const forceStrength = (minDistance - distance) / minDistance;
+        avoidanceForce.add(repulsion.multiplyScalar(forceStrength * 2.0));
+        needsAdjustment = true;
+      }
+    });
+
+    if (needsAdjustment) {
+      // Apply gentle avoidance force
+      const adjustedPosition = intendedPosition.clone().add(avoidanceForce);
+      return adjustedPosition;
+    }
+
+    return intendedPosition;
   }
 
   public updateConfiguration(newConfig: Partial<InstrumentAvatarsConfig>): void {
