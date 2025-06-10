@@ -31,8 +31,8 @@ export abstract class BaseAvatar {
   // Fade timing
   protected fadeInDelay = 0;
   protected fadeOutDelay = 0;
-  protected readonly fadeInThreshold = 0.3;  // Appear when confidence > 30%
-  protected readonly fadeOutThreshold = 0.1; // Disappear when confidence < 10%
+  protected readonly fadeInThreshold = 0.15; // Appear when confidence > 15% (was 30%)
+  protected readonly fadeOutThreshold = 0.05; // Disappear when confidence < 5% (was 10%)
   protected readonly fadeOutDelayTime = 2000; // 2 second delay before fade out
   
   // Configuration
