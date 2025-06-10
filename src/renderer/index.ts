@@ -237,8 +237,18 @@ class MusicVisualizerRenderer {
     `;
 
     this.audioControlsEl.innerHTML = `
-      <div style="display: flex; align-items: center; margin-bottom: 15px;">
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
         <h3 style="margin: 0; color: #8b5cf6; font-size: 16px;">🎵 Music Visualizer</h3>
+        <button id="music-visualizer-pin" class="pin-button" style="
+          background: none;
+          border: none;
+          color: #6b7280;
+          cursor: pointer;
+          font-size: 14px;
+          padding: 4px;
+          border-radius: 4px;
+          transition: color 0.2s;
+        " title="Pin/Unpin Panel">📌</button>
       </div>
       <input type="file" id="fileInput" accept=".wav" style="
         width: 100%;
@@ -309,7 +319,19 @@ class MusicVisualizerRenderer {
     `;
 
     this.featuresDisplayEl.innerHTML = `
-      <h4 style="margin: 0 0 10px 0; color: #8b5cf6; font-size: 12px;">🎛 Audio Features</h4>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+        <h4 style="margin: 0; color: #8b5cf6; font-size: 12px;">🎛 Audio Features</h4>
+        <button id="audio-features-pin" class="pin-button" style="
+          background: none;
+          border: none;
+          color: #6b7280;
+          cursor: pointer;
+          font-size: 12px;
+          padding: 4px;
+          border-radius: 4px;
+          transition: color 0.2s;
+        " title="Pin/Unpin Panel">📌</button>
+      </div>
       <div id="features-content">No audio loaded</div>
     `;
 
@@ -339,7 +361,19 @@ class MusicVisualizerRenderer {
     `;
     
     extendedFeaturesEl.innerHTML = `
-      <h4 style="margin: 0 0 10px 0; color: #8b5cf6; font-size: 12px;">🎵 Advanced Audio Analysis</h4>
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;">
+        <h4 style="margin: 0; color: #8b5cf6; font-size: 12px;">🎵 Advanced Audio Analysis</h4>
+        <button id="advanced-analysis-pin" class="pin-button" style="
+          background: none;
+          border: none;
+          color: #6b7280;
+          cursor: pointer;
+          font-size: 12px;
+          padding: 4px;
+          border-radius: 4px;
+          transition: color 0.2s;
+        " title="Pin/Unpin Panel">📌</button>
+      </div>
       <div class="features-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
         <div class="instrument-detection">
           <h5 style="margin: 0 0 5px 0; color: #06b6d4;">🎸 Instruments</h5>
@@ -361,6 +395,83 @@ class MusicVisualizerRenderer {
     `;
 
     console.log('Extended features panel created');
+
+    // Cosmic Effects Controls Panel
+    const cosmicEffectsEl = document.createElement('div');
+    cosmicEffectsEl.className = 'cosmic-effects-panel';
+    cosmicEffectsEl.id = 'cosmic-effects-panel';
+    cosmicEffectsEl.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: rgba(20, 25, 40, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 15px;
+      border: 1px solid rgba(100, 120, 200, 0.3);
+      color: #e0e5ff;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      min-width: 280px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    `;
+    
+    cosmicEffectsEl.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+        <h4 style="margin: 0; color: #8b5cf6; font-size: 12px;">🌌 Cosmic Effects</h4>
+        <button id="cosmic-effects-pin" class="pin-button" style="
+          background: none;
+          border: none;
+          color: #6b7280;
+          cursor: pointer;
+          font-size: 12px;
+          padding: 4px;
+          border-radius: 4px;
+          transition: color 0.2s;
+        " title="Pin/Unpin Panel">📌</button>
+      </div>
+      <div class="effects-controls" style="display: grid; gap: 8px;">
+        <label style="display: flex; align-items: center; cursor: pointer;">
+          <input type="checkbox" id="nebulae-enabled" checked style="margin-right: 8px; accent-color: #8b5cf6;">
+          <span style="color: #e0e5ff;">🌫️ Nebulae Systems</span>
+        </label>
+        <label style="display: flex; align-items: center; cursor: pointer;">
+          <input type="checkbox" id="portals-enabled" checked style="margin-right: 8px; accent-color: #06b6d4;">
+          <span style="color: #e0e5ff;">🌀 Energy Portals</span>
+        </label>
+        <label style="display: flex; align-items: center; cursor: pointer;">
+          <input type="checkbox" id="plasma-enabled" checked style="margin-right: 8px; accent-color: #10b981;">
+          <span style="color: #e0e5ff;">⚡ Plasma Waves</span>
+        </label>
+        <label style="display: flex; align-items: center; cursor: pointer;">
+          <input type="checkbox" id="gravity-enabled" checked style="margin-right: 8px; accent-color: #f59e0b;">
+          <span style="color: #e0e5ff;">🕳️ Gravitational Lenses</span>
+        </label>
+      </div>
+      <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(100, 120, 200, 0.2);">
+        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+          <span style="color: #94a3b8; font-size: 10px; margin-right: 8px;">Intensity:</span>
+          <input type="range" id="cosmic-intensity" min="0" max="100" value="80" style="
+            flex: 1;
+            margin-right: 8px;
+            accent-color: #8b5cf6;
+          ">
+          <span id="intensity-display" style="color: #94a3b8; font-size: 10px; min-width: 30px;">80%</span>
+        </div>
+        <div style="display: flex; align-items: center;">
+          <span style="color: #94a3b8; font-size: 10px; margin-right: 8px;">Responsiveness:</span>
+          <input type="range" id="cosmic-responsiveness" min="0" max="100" value="70" style="
+            flex: 1;
+            margin-right: 8px;
+            accent-color: #06b6d4;
+          ">
+          <span id="responsiveness-display" style="color: #94a3b8; font-size: 10px; min-width: 30px;">70%</span>
+        </div>
+      </div>
+    `;
+
+    console.log('Cosmic effects panel created');
 
     // 3D Visualizer Container - reuse existing or create new
     this.visualizerContainerEl = document.getElementById('visualizer-container') as HTMLDivElement;
@@ -390,6 +501,7 @@ class MusicVisualizerRenderer {
     document.body.appendChild(this.audioControlsEl);
     document.body.appendChild(this.featuresDisplayEl);
     document.body.appendChild(extendedFeaturesEl);
+    document.body.appendChild(cosmicEffectsEl);
 
     console.log('=== UI ELEMENTS ADDED TO DOM ===');
     console.log('Audio controls element:', !!document.getElementById('audio-controls'));
@@ -591,6 +703,12 @@ class MusicVisualizerRenderer {
     } else {
       console.error('❌ Some event listeners failed to attach!', attachedListeners);
     }
+
+    // Setup cosmic effects controls
+    this.setupCosmicEffectsControls();
+    
+    // Setup smart UI auto-hide functionality
+    this.setupSmartUIHiding();
 
     // Progress control
     const progressSlider = document.getElementById('progressSlider') as HTMLInputElement;
@@ -1135,6 +1253,243 @@ class MusicVisualizerRenderer {
         playPauseBtn.style.background = '#10b981';
       }
     }
+  }
+
+  private setupCosmicEffectsControls(): void {
+    console.log('Setting up cosmic effects controls...');
+
+    // Cosmic effects toggles
+    const nebulaeCheckbox = document.getElementById('nebulae-enabled') as HTMLInputElement;
+    const portalsCheckbox = document.getElementById('portals-enabled') as HTMLInputElement;
+    const plasmaCheckbox = document.getElementById('plasma-enabled') as HTMLInputElement;
+    const gravityCheckbox = document.getElementById('gravity-enabled') as HTMLInputElement;
+
+    // Intensity and responsiveness sliders
+    const intensitySlider = document.getElementById('cosmic-intensity') as HTMLInputElement;
+    const responsivenessSlider = document.getElementById('cosmic-responsiveness') as HTMLInputElement;
+    const intensityDisplay = document.getElementById('intensity-display') as HTMLSpanElement;
+    const responsivenessDisplay = document.getElementById('responsiveness-display') as HTMLSpanElement;
+
+    // Function to update cosmic effects configuration
+    const updateCosmicConfig = () => {
+      if (this.visualizer) {
+        const cosmicEffects = (this.visualizer as any).getCosmicEffects?.();
+        if (cosmicEffects) {
+          const config = {
+            nebulaeEnabled: nebulaeCheckbox?.checked ?? true,
+            portalsEnabled: portalsCheckbox?.checked ?? true,
+            plasmaEnabled: plasmaCheckbox?.checked ?? true,
+            gravityEnabled: gravityCheckbox?.checked ?? true,
+            intensity: (intensitySlider?.value ? parseInt(intensitySlider.value) : 80) / 100,
+            responsiveness: (responsivenessSlider?.value ? parseInt(responsivenessSlider.value) : 70) / 100
+          };
+          
+          cosmicEffects.updateConfiguration(config);
+          console.log('Cosmic effects config updated:', config);
+        }
+      }
+    };
+
+    // Add event listeners for checkboxes
+    nebulaeCheckbox?.addEventListener('change', updateCosmicConfig);
+    portalsCheckbox?.addEventListener('change', updateCosmicConfig);
+    plasmaCheckbox?.addEventListener('change', updateCosmicConfig);
+    gravityCheckbox?.addEventListener('change', updateCosmicConfig);
+
+    // Add event listeners for sliders
+    intensitySlider?.addEventListener('input', (event) => {
+      const value = (event.target as HTMLInputElement).value;
+      if (intensityDisplay) {
+        intensityDisplay.textContent = `${value}%`;
+      }
+      updateCosmicConfig();
+    });
+
+    responsivenessSlider?.addEventListener('input', (event) => {
+      const value = (event.target as HTMLInputElement).value;
+      if (responsivenessDisplay) {
+        responsivenessDisplay.textContent = `${value}%`;
+      }
+      updateCosmicConfig();
+    });
+
+    console.log('Cosmic effects controls setup complete');
+  }
+
+  private setupSmartUIHiding(): void {
+    console.log('Setting up smart UI auto-hiding...');
+
+    // Panel configurations
+    const panels = [
+      {
+        id: 'audio-controls',
+        pinButtonId: 'music-visualizer-pin',
+        triggerArea: { left: 0, bottom: 0, width: 400, height: 200 }
+      },
+      {
+        id: 'features-display',
+        pinButtonId: 'audio-features-pin',
+        triggerArea: { right: 0, top: 0, width: 300, height: 200 }
+      },
+      {
+        id: 'extended-features-panel',
+        pinButtonId: 'advanced-analysis-pin',
+        triggerArea: { left: 0, bottom: 0, width: 650, height: 320 }
+      },
+      {
+        id: 'cosmic-effects-panel',
+        pinButtonId: 'cosmic-effects-pin',
+        triggerArea: { left: 0, top: 0, width: 320, height: 400 }
+      }
+    ];
+
+    // State tracking
+    const panelStates = new Map<string, { pinned: boolean; visible: boolean; timeout?: number }>();
+
+    // Initialize panel states
+    panels.forEach(panel => {
+      panelStates.set(panel.id, { pinned: false, visible: true });
+    });
+
+    // Function to show/hide panel
+    const setPanelVisibility = (panelId: string, visible: boolean, immediate = false) => {
+      const panel = document.getElementById(panelId);
+      const state = panelStates.get(panelId);
+      
+      if (!panel || !state) return;
+
+      // Clear any existing timeout
+      if (state.timeout) {
+        clearTimeout(state.timeout);
+        state.timeout = undefined;
+      }
+
+      state.visible = visible;
+
+      if (visible) {
+        // Show panel immediately
+        panel.style.transition = immediate ? 'none' : 'opacity 0.3s ease, transform 0.3s ease';
+        panel.style.opacity = '1';
+        panel.style.transform = 'translateY(0) translateX(0)';
+        panel.style.pointerEvents = 'auto';
+      } else {
+        // Hide panel with delay if not pinned
+        if (!state.pinned) {
+          const hidePanel = () => {
+            panel.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+            panel.style.opacity = '0';
+            
+            // Different hide animations based on panel position
+            if (panelId === 'features-display') {
+              panel.style.transform = 'translateY(-20px) translateX(20px)';
+            } else if (panelId === 'cosmic-effects-panel') {
+              panel.style.transform = 'translateY(-20px) translateX(-20px)';
+            } else {
+              panel.style.transform = 'translateY(20px)';
+            }
+            
+            panel.style.pointerEvents = 'none';
+          };
+
+          state.timeout = window.setTimeout(hidePanel, 1000); // 1 second delay
+        }
+      }
+    };
+
+    // Function to check if mouse is in trigger area
+    const isInTriggerArea = (x: number, y: number, area: any) => {
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+
+      // Calculate actual bounds
+      const bounds = {
+        left: area.left !== undefined ? area.left : windowWidth - (area.right || 0) - area.width,
+        top: area.top !== undefined ? area.top : windowHeight - (area.bottom || 0) - area.height,
+        width: area.width,
+        height: area.height
+      };
+
+      return x >= bounds.left && 
+             x <= bounds.left + bounds.width && 
+             y >= bounds.top && 
+             y <= bounds.top + bounds.height;
+    };
+
+    // Mouse move handler
+    const handleMouseMove = (event: MouseEvent) => {
+      const { clientX: x, clientY: y } = event;
+
+      panels.forEach(panel => {
+        const state = panelStates.get(panel.id);
+        if (!state) return;
+
+        const inArea = isInTriggerArea(x, y, panel.triggerArea);
+        
+        // Show panel if mouse is in area or panel is pinned
+        if (inArea || state.pinned) {
+          if (!state.visible) {
+            setPanelVisibility(panel.id, true);
+          }
+        } else {
+          if (state.visible && !state.pinned) {
+            setPanelVisibility(panel.id, false);
+          }
+        }
+      });
+    };
+
+    // Pin button handlers
+    panels.forEach(panel => {
+      const pinButton = document.getElementById(panel.pinButtonId);
+      if (pinButton) {
+        pinButton.addEventListener('click', () => {
+          const state = panelStates.get(panel.id);
+          if (!state) return;
+
+          state.pinned = !state.pinned;
+          
+          // Update pin button appearance
+          if (state.pinned) {
+            pinButton.style.color = '#8b5cf6';
+            pinButton.title = 'Unpin Panel';
+            setPanelVisibility(panel.id, true, true);
+          } else {
+            pinButton.style.color = '#6b7280';
+            pinButton.title = 'Pin Panel';
+          }
+
+          console.log(`Panel ${panel.id} ${state.pinned ? 'pinned' : 'unpinned'}`);
+        });
+
+        // Hover effect for pin button
+        pinButton.addEventListener('mouseenter', () => {
+          if (!panelStates.get(panel.id)?.pinned) {
+            pinButton.style.color = '#9ca3af';
+          }
+        });
+
+        pinButton.addEventListener('mouseleave', () => {
+          if (!panelStates.get(panel.id)?.pinned) {
+            pinButton.style.color = '#6b7280';
+          }
+        });
+      }
+    });
+
+    // Add global mouse move listener
+    document.addEventListener('mousemove', handleMouseMove);
+
+    // Initially hide all unpinned panels after a delay
+    setTimeout(() => {
+      panels.forEach(panel => {
+        const state = panelStates.get(panel.id);
+        if (state && !state.pinned) {
+          setPanelVisibility(panel.id, false);
+        }
+      });
+    }, 3000); // 3 second initial delay
+
+    console.log('Smart UI auto-hiding setup complete');
   }
 
   private destroy(): void {

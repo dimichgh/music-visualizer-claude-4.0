@@ -173,6 +173,10 @@ export class MusicVisualizer {
     this.sceneManager.stopRenderLoop();
   }
 
+  public getCosmicEffects() {
+    return this.cosmicEffects;
+  }
+
   public dispose(): void {
     this.particleSystems.forEach(system => system.dispose());
     if (this.cosmicEffects) {
