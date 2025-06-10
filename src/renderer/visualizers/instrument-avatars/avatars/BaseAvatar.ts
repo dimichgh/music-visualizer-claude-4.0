@@ -31,8 +31,8 @@ export abstract class BaseAvatar {
   // Fade timing
   protected fadeInDelay = 0;
   protected fadeOutDelay = 0;
-  protected readonly fadeInThreshold = 0.15; // Appear when confidence > 15% (was 30%)
-  protected readonly fadeOutThreshold = 0.05; // Disappear when confidence < 5% (was 10%)
+  protected readonly fadeInThreshold = 0.01; // DEBUGGING: Very low threshold - appear at 1% (was 15%)
+  protected readonly fadeOutThreshold = 0.005; // DEBUGGING: Very low threshold - disappear at 0.5% (was 5%)
   protected readonly fadeOutDelayTime = 2000; // 2 second delay before fade out
   
   // Configuration
@@ -50,11 +50,22 @@ export abstract class BaseAvatar {
     this.group.name = `${instrumentName}Avatar`;
     
     this.scene.add(this.group);
+    console.log(`👻 ${instrumentName} added to scene`);
+    
     this.initializeMaterials(primaryColor);
+    console.log(`👻 ${instrumentName} materials initialized`);
+    
     this.createGeometry();
+    console.log(`👻 ${instrumentName} geometry created - children count: ${this.group.children.length}`);
+    
     this.setVisible(false);
     
-    console.log(`BaseAvatar: ${instrumentName} avatar initialized`);
+    console.log(`👻 ${instrumentName} avatar fully initialized:`, {
+      childrenCount: this.group.children.length,
+      hasEtherealMaterial: !!this.etherealMaterial,
+      position: `${this.group.position.x}, ${this.group.position.y}, ${this.group.position.z}`,
+      inScene: !!this.scene.getObjectByName(this.group.name)
+    });
   }
 
   protected initializeMaterials(primaryColor: THREE.Color): void {
@@ -69,9 +80,28 @@ export abstract class BaseAvatar {
     this.animationTime += deltaTime * 0.001; // Convert to seconds
     this.config = config;
     
-    // Update confidence with smoothing
+    // Update confidence with smoothing (but skip smoothing for high manual test confidence)
     this.targetConfidence = confidence;
-    this.currentConfidence += (this.targetConfidence - this.currentConfidence) * 0.1;
+    
+    // BYPASS SMOOTHING for manual tests with high confidence
+    if (confidence > 0.7) {
+      console.log(`👻 ${this.group.name} BYPASSING SMOOTHING for manual test - setting confidence directly to ${confidence.toFixed(3)}`);
+      this.currentConfidence = confidence; // Direct assignment for manual tests
+    } else {
+      this.currentConfidence += (this.targetConfidence - this.currentConfidence) * 0.1; // Normal smoothing
+    }
+    
+    // DEBUG CONFIDENCE FLOW
+    console.log(`👻 ${this.group.name} updateWithAudio:`, {
+      inputConfidence: confidence.toFixed(3),
+      targetConfidence: this.targetConfidence.toFixed(3),
+      currentConfidence: this.currentConfidence.toFixed(3),
+      fadeInThreshold: this.fadeInThreshold,
+      fadeOutThreshold: this.fadeOutThreshold,
+      currentlyVisible: this.isVisibleFlag,
+      shouldFadeIn: this.currentConfidence > this.fadeInThreshold,
+      shouldFadeOut: this.currentConfidence < this.fadeOutThreshold
+    });
     
     // Handle visibility based on confidence thresholds
     this.updateVisibility(deltaTime);
@@ -137,11 +167,25 @@ export abstract class BaseAvatar {
     const opacity = this.config.opacity * this.currentConfidence;
     const intensity = this.currentConfidence;
     
-    this.etherealMaterial.updateProperties({
-      opacity,
-      intensity,
-      time: this.animationTime
+    console.log(`👻 ${this.group.name} updateMaterialProperties:`, {
+      configOpacity: this.config.opacity,
+      currentConfidence: this.currentConfidence,
+      calculatedOpacity: opacity,
+      intensity: intensity,
+      animationTime: this.animationTime.toFixed(2),
+      materialExists: !!this.etherealMaterial
     });
+    
+    if (this.etherealMaterial) {
+      this.etherealMaterial.updateProperties({
+        opacity,
+        intensity,
+        time: this.animationTime
+      });
+      console.log(`👻 ${this.group.name} material updated successfully`);
+    } else {
+      console.warn(`👻 ${this.group.name} NO ETHEREAL MATERIAL FOUND!`);
+    }
   }
 
   protected abstract performInstrumentSpecificAnimation(updateData: AvatarUpdateData): void;
@@ -174,10 +218,35 @@ export abstract class BaseAvatar {
     this.isVisibleFlag = visible;
     this.group.visible = visible;
     
+    console.log(`👻 ${this.group.name} setVisible(${visible}):`, {
+      position: `${this.group.position.x.toFixed(1)}, ${this.group.position.y.toFixed(1)}, ${this.group.position.z.toFixed(1)}`,
+      scale: this.group.scale.x.toFixed(3),
+      childrenCount: this.group.children.length,
+      groupVisible: this.group.visible,
+      hasEtherealMaterial: !!this.etherealMaterial
+    });
+    
     if (visible) {
       // Reset fade delays when becoming visible
       this.fadeInDelay = 0;
       this.fadeOutDelay = 0;
+      
+      // DEBUG: Force update material properties when making visible
+      if (this.etherealMaterial) {
+        const debugOpacity = this.config.opacity * Math.max(0.5, this.currentConfidence); // Ensure some opacity
+        console.log(`👻 ${this.group.name} FORCE UPDATING MATERIAL:`, {
+          configOpacity: this.config.opacity,
+          currentConfidence: this.currentConfidence,
+          calculatedOpacity: debugOpacity,
+          materialExists: !!this.etherealMaterial
+        });
+        
+        this.etherealMaterial.updateProperties({
+          opacity: debugOpacity,
+          intensity: Math.max(0.5, this.currentConfidence),
+          time: this.animationTime
+        });
+      }
     }
   }
 
@@ -208,6 +277,14 @@ export abstract class BaseAvatar {
   public updatePosition(newPosition: THREE.Vector3): void {
     this.currentPosition.copy(newPosition);
     this.group.position.copy(newPosition);
+    
+    console.log(`👻 ${this.group.name} updatePosition:`, {
+      x: newPosition.x.toFixed(1),
+      y: newPosition.y.toFixed(1), 
+      z: newPosition.z.toFixed(1),
+      distance: newPosition.length().toFixed(1),
+      isVisible: this.isVisibleFlag
+    });
   }
 
   public updateConfiguration(config: AvatarConfig): void {

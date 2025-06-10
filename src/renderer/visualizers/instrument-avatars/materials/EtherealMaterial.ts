@@ -163,6 +163,17 @@ export class EtherealMaterial {
     this.uniforms.uTime.value = properties.time;
     this.uniforms.uOpacity.value = properties.opacity;
     this.uniforms.uIntensity.value = properties.intensity;
+    
+    // DEBUG: Log material updates
+    console.log('👻 EtherealMaterial updateProperties:', {
+      opacity: properties.opacity.toFixed(4),
+      intensity: properties.intensity.toFixed(4),
+      time: properties.time.toFixed(2),
+      materialNeedsUpdate: this.material.needsUpdate
+    });
+    
+    // Force material update
+    this.material.needsUpdate = true;
   }
 
   public updateColor(primaryColor: THREE.Color, intensity: number = 1.0): void {

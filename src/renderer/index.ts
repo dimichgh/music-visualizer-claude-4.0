@@ -140,8 +140,9 @@ class MusicVisualizerRenderer {
     // **MUCH MORE SENSITIVE DETECTION** - Lower thresholds for easier triggering
     console.log('🎵 Audio levels:', { overallLevel: overallLevel.toFixed(3), bassLevel: bassLevel.toFixed(3), midLevel: midLevel.toFixed(3), trebleLevel: trebleLevel.toFixed(3), dominantFreq: dominantFrequency.toFixed(0) });
 
-    // Only detect instruments when there's ANY audio energy (much lower threshold)
-    if (overallLevel < 0.01) {
+    // DEBUGGING: Very permissive detection - detect instruments with ANY audio
+    if (overallLevel < 0.001) { // ← SUPER LOW: was 0.01, now 0.001
+      console.log('🎵 NO AUDIO DETECTED - overallLevel too low:', overallLevel.toFixed(6));
       return {
         drums: 0,
         guitar: 0, 
@@ -151,6 +152,8 @@ class MusicVisualizerRenderer {
         strings: 0
       };
     }
+    
+    console.log('🎵 AUDIO DETECTED - proceeding with instrument detection. Overall level:', overallLevel.toFixed(4));
 
     // **BALANCED INSTRUMENT DETECTION** - Equal sensitivity and multipliers
     
@@ -198,9 +201,9 @@ class MusicVisualizerRenderer {
       stringsConfidence *= (0.7 + Math.sin(Date.now() * 0.001) * 0.3); // ← INCREASED base from 0.5
     }
 
-    // Apply minimum threshold and add some randomness for realism
-    const minThreshold = 0.05;
-    const randomFactor = 0.9 + Math.random() * 0.2; // ±10% randomness
+    // TEMPORARILY DISABLE THRESHOLD to test detection
+    const minThreshold = 0.00; // ← DISABLED: was 0.05, now 0.00 for debugging
+    const randomFactor = 1.0; // ← DISABLED: was 0.9-1.1, now fixed 1.0 for consistency
 
     // COMPREHENSIVE DETECTION DEBUGGING
     console.log('🎵 INSTRUMENT DETECTION DEBUG - Raw Confidences:', {

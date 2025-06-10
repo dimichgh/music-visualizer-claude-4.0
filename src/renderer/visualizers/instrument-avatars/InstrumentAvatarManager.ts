@@ -333,16 +333,49 @@ export class InstrumentAvatarManager {
       // Calculate proper opacity based on configuration
       const effectiveConfidence = intensity * avatarConfig.opacity * this.config.globalOpacity;
       
-      console.log(`🎭 Triggering ${instrumentName} avatar:`, {
+      console.log(`🎭 MANUAL TRIGGER ${instrumentName.toUpperCase()}:`, {
         intensity: (intensity * 100).toFixed(0) + '%',
         configOpacity: (avatarConfig.opacity * 100).toFixed(0) + '%',
         globalOpacity: (this.config.globalOpacity * 100).toFixed(0) + '%',
-        effectiveConfidence: (effectiveConfidence * 100).toFixed(0) + '%'
+        effectiveConfidence: (effectiveConfidence * 100).toFixed(0) + '%',
+        currentVisibility: avatar.isVisible(),
+        currentConfidence: avatar.getCurrentConfidence().toFixed(3)
       });
+      
+      // FIX 1: FORCE PROPER POSITIONING for manual tests
+      const posData = this.instrumentPositions[instrumentName as keyof typeof this.instrumentPositions];
+      if (posData) {
+        const instrumentRadius = this.orbitRadius * posData.radiusMultiplier;
+        const height = posData.heightLevel * 3;
+        const angle = posData.rotationOffset;
+        
+        const testPosition = new THREE.Vector3(
+          Math.cos(angle) * instrumentRadius,
+          height,
+          Math.sin(angle) * instrumentRadius
+        );
+        
+        console.log(`🎭 FORCING ${instrumentName} to test position:`, {
+          x: testPosition.x.toFixed(1),
+          y: testPosition.y.toFixed(1),
+          z: testPosition.z.toFixed(1),
+          radius: instrumentRadius.toFixed(1),
+          angle: (angle * 180 / Math.PI).toFixed(0) + '°'
+        });
+        
+        avatar.updatePosition(testPosition);
+      }
+      
+      // FIX 2: FORCE VISIBILITY AND HIGH CONFIDENCE
+      console.log(`🎭 FORCING ${instrumentName} to be visible for manual test...`);
+      avatar.setVisible(true);
+      
+      // FIX 3: Use much higher confidence for manual tests to ensure visibility
+      const manualTestConfidence = 0.8; // Fixed high confidence instead of calculated
       
       // Update avatar with proper audio data structure
       avatar.updateWithAudio({
-        confidence: effectiveConfidence,
+        confidence: manualTestConfidence, // ← FIXED: Use high confidence
         audioFeatures: {
           bassLevel: 0.5,
           midLevel: 0.5,
@@ -361,7 +394,18 @@ export class InstrumentAvatarManager {
       // Also trigger special effects
       avatar.triggerSpecialEffect(intensity);
       
-      console.log(`🎭 ${instrumentName} avatar triggered successfully!`);
+      console.log(`🎭 ${instrumentName} avatar FORCED VISIBLE, POSITIONED, and triggered with high confidence!`);
+      
+      // Log current state after update
+      setTimeout(() => {
+        console.log(`🎭 ${instrumentName} POST-UPDATE STATE:`, {
+          isVisible: avatar.isVisible(),
+          confidence: avatar.getCurrentConfidence().toFixed(3),
+          position: `${avatar.getBasePosition().x.toFixed(1)}, ${avatar.getBasePosition().y.toFixed(1)}, ${avatar.getBasePosition().z.toFixed(1)}`,
+          manualTestConfidence: manualTestConfidence
+        });
+      }, 100);
+      
     } else {
       console.warn(`🎭 Failed to trigger ${instrumentName}: avatar or config not found`);
     }

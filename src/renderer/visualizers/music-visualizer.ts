@@ -131,6 +131,16 @@ export class MusicVisualizer {
     if (this.audioFeatures && this.avatarManager) {
       const audioData: AudioData = this.convertToAudioData(this.audioFeatures);
       this.avatarManager.updateAudioFeatures(audioData);
+      
+      // DEBUG: Log camera position occasionally to help with debugging
+      if (Date.now() % 10000 < 20) { // Every ~10 seconds for a brief moment
+        const camera = this.sceneManager.getCamera();
+        console.log('📹 Camera Debug:', {
+          position: `${camera.position.x.toFixed(1)}, ${camera.position.y.toFixed(1)}, ${camera.position.z.toFixed(1)}`,
+          lookingAt: '0, 0, 0',
+          avatarDistance: Math.sqrt((camera.position.x - 9.9)**2 + (camera.position.y + 3)**2 + (camera.position.z - 17.1)**2).toFixed(1)
+        });
+      }
     }
 
     // Camera movement based on audio
