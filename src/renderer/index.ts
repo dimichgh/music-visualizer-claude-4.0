@@ -40,6 +40,7 @@ class MusicVisualizerRenderer {
   private audioPlayer: AudioPlayer;
   private isAudioLoaded = false;
   private currentFileName = '';
+  private progressUpdateInterval: number | null = null;
 
   constructor() {
     console.log('=== MUSIC VISUALIZER RENDERER STARTING ===');
@@ -75,6 +76,14 @@ class MusicVisualizerRenderer {
       });
       // Process audio data for visualization
       this.processAudioForVisualization(audioData);
+    });
+
+    // Set up callback for when audio ends naturally
+    this.audioPlayer.onAudioEnded(() => {
+      console.log('Audio ended naturally');
+      this.updatePlayPauseButton(false);
+      this.stopProgressUpdates();
+      this.updateStatus('✅ Audio finished playing');
     });
   }
 
@@ -241,13 +250,28 @@ class MusicVisualizerRenderer {
         color: #e0e5ff;
         font-size: 12px;
       ">
-      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
-        <button id="playBtn" style="padding: 8px; border: none; border-radius: 6px; background: #10b981; color: white; cursor: pointer; font-size: 11px;">▶ Play</button>
-        <button id="pauseBtn" style="padding: 8px; border: none; border-radius: 6px; background: #f59e0b; color: white; cursor: pointer; font-size: 11px;">⏸ Pause</button>
+      <div style="display: grid; grid-template-columns: 2fr 1fr; gap: 8px; margin-bottom: 10px;">
+        <button id="playPauseBtn" style="padding: 8px; border: none; border-radius: 6px; background: #10b981; color: white; cursor: pointer; font-size: 11px;">▶ Play</button>
         <button id="stopBtn" style="padding: 8px; border: none; border-radius: 6px; background: #ef4444; color: white; cursor: pointer; font-size: 11px;">⏹ Stop</button>
       </div>
       <div style="margin-bottom: 10px;">
         <button id="testToneBtn" style="width: 100%; padding: 8px; border: none; border-radius: 6px; background: #6366f1; color: white; cursor: pointer; font-size: 11px;">🔊 Test Audio System</button>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 5px;">
+          <span style="color: #94a3b8; font-size: 10px;" id="currentTime">0:00</span>
+          <span style="color: #8b5cf6; font-size: 10px;">⏱ Progress</span>
+          <span style="color: #94a3b8; font-size: 10px;" id="totalTime">0:00</span>
+        </div>
+        <input type="range" id="progressSlider" min="0" max="100" value="0" style="
+          width: 100%;
+          height: 6px;
+          margin-bottom: 10px;
+          background: linear-gradient(to right, #8b5cf6 0%, #8b5cf6 0%, rgba(30, 35, 50, 0.8) 0%);
+          border-radius: 3px;
+          appearance: none;
+          cursor: pointer;
+        ">
       </div>
       <div style="display: flex; align-items: center; margin-bottom: 10px;">
         <span style="color: #94a3b8; font-size: 11px; margin-right: 8px;">🔊 Volume:</span>
@@ -452,46 +476,62 @@ class MusicVisualizerRenderer {
     });
 
     // Audio control buttons
-    const playBtn = document.getElementById('playBtn');
-    const pauseBtn = document.getElementById('pauseBtn');
+    const playPauseBtn = document.getElementById('playPauseBtn');
     const stopBtn = document.getElementById('stopBtn');
     const testToneBtn = document.getElementById('testToneBtn');
     
     console.log('Button elements found:', {
-      playBtn: !!playBtn,
-      pauseBtn: !!pauseBtn,
+      playPauseBtn: !!playPauseBtn,
       stopBtn: !!stopBtn,
       testToneBtn: !!testToneBtn
     });
     
-    if (!playBtn || !pauseBtn || !stopBtn || !testToneBtn) {
+    if (!playPauseBtn || !stopBtn || !testToneBtn) {
       console.error('Missing button elements! DOM may not be ready yet.');
       console.log('DOM state:', {
         audioControlsInDOM: !!document.getElementById('audio-controls'),
         allButtons: {
-          play: document.getElementById('playBtn'),
-          pause: document.getElementById('pauseBtn'),
+          playPause: document.getElementById('playPauseBtn'),
           stop: document.getElementById('stopBtn'),
           test: document.getElementById('testToneBtn')
         }
       });
     }
     
-    playBtn?.addEventListener('click', async () => {
-      console.log('=== PLAY BUTTON CLICKED ===');
+    playPauseBtn?.addEventListener('click', async () => {
+      console.log('=== PLAY/PAUSE BUTTON CLICKED ===');
       console.log('System state:', {
         isAudioLoaded: this.isAudioLoaded,
         currentFileName: this.currentFileName,
         audioPlayerExists: !!this.audioPlayer,
-        visualizerExists: !!this.visualizer
+        visualizerExists: !!this.visualizer,
+        isCurrentlyPlaying: this.audioPlayer.isCurrentlyPlaying()
       });
       
-      if (this.isAudioLoaded) {
+      if (!this.isAudioLoaded) {
+        console.log('No audio file loaded');
+        this.updateStatus('⚠️ No audio file loaded - Please select a WAV file first');
+        return;
+      }
+
+      const isCurrentlyPlaying = this.audioPlayer.isCurrentlyPlaying();
+      
+      if (isCurrentlyPlaying) {
+        // Currently playing, so pause
+        console.log('Pausing audio...');
+        this.audioPlayer.pause();
+        this.stopProgressUpdates();
+        this.updatePlayPauseButton(false);
+        this.updateStatus('⏸ Audio paused');
+      } else {
+        // Currently not playing, so play
         try {
-          console.log('Attempting to start audio playback...');
+          console.log('Starting/resuming audio playback...');
           this.updateStatus('🎵 Starting playback...');
           
           await this.audioPlayer.play();
+          this.startProgressUpdates();
+          this.updatePlayPauseButton(true);
           
           console.log('AudioPlayer.play() completed successfully');
           this.updateStatus('🎵 Playing audio - Listen for sound!');
@@ -508,29 +548,25 @@ class MusicVisualizerRenderer {
             if (!isPlaying) {
               console.error('Audio should be playing but isCurrentlyPlaying() returns false');
               this.updateStatus('⚠️ Audio may not be playing - Check console for details');
+              this.updatePlayPauseButton(false);
             }
           }, 500);
           
         } catch (error) {
-          console.error('=== PLAY BUTTON ERROR ===');
+          console.error('=== PLAYBACK ERROR ===');
           console.error('Playback failed:', error);
           this.updateStatus(`❌ Playback error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+          this.updatePlayPauseButton(false);
         }
-      } else {
-        console.log('No audio file loaded');
-        this.updateStatus('⚠️ No audio file loaded - Please select a WAV file first');
       }
-    });
-
-    pauseBtn?.addEventListener('click', () => {
-      console.log('Pause button clicked');
-      this.audioPlayer.pause();
-      this.updateStatus('Audio paused');
     });
 
     stopBtn?.addEventListener('click', () => {
       console.log('Stop button clicked');
       this.audioPlayer.stop();
+      this.stopProgressUpdates();
+      this.resetProgress();
+      this.updatePlayPauseButton(false);
       this.updateStatus('Audio stopped');
     });
 
@@ -543,8 +579,7 @@ class MusicVisualizerRenderer {
     // Confirm event listeners are attached
     const attachedListeners = {
       fileInput: !!fileInput,
-      playBtn: !!playBtn,
-      pauseBtn: !!pauseBtn,
+      playPauseBtn: !!playPauseBtn,
       stopBtn: !!stopBtn,
       testToneBtn: !!testToneBtn
     };
@@ -556,6 +591,38 @@ class MusicVisualizerRenderer {
     } else {
       console.error('❌ Some event listeners failed to attach!', attachedListeners);
     }
+
+    // Progress control
+    const progressSlider = document.getElementById('progressSlider') as HTMLInputElement;
+    let isUserSeeking = false;
+    
+    progressSlider?.addEventListener('mousedown', () => {
+      isUserSeeking = true;
+      console.log('User started seeking');
+    });
+    
+    progressSlider?.addEventListener('mouseup', () => {
+      if (isUserSeeking && this.isAudioLoaded) {
+        const seekPercent = parseInt(progressSlider.value);
+        const duration = this.audioPlayer.getDuration();
+        const seekTime = (seekPercent / 100) * duration;
+        
+        console.log(`Seeking to ${seekTime.toFixed(2)}s (${seekPercent}%)`);
+        this.audioPlayer.seek(seekTime);
+      }
+      isUserSeeking = false;
+    });
+    
+    progressSlider?.addEventListener('input', (event) => {
+      if (isUserSeeking && this.isAudioLoaded) {
+        const seekPercent = parseInt((event.target as HTMLInputElement).value);
+        const duration = this.audioPlayer.getDuration();
+        const seekTime = (seekPercent / 100) * duration;
+        
+        // Update time display while dragging
+        this.updateTimeDisplay(seekTime, duration);
+      }
+    });
 
     // Volume control
     const volumeSlider = document.getElementById('volumeSlider') as HTMLInputElement;
@@ -769,6 +836,12 @@ class MusicVisualizerRenderer {
       
       const duration = this.audioPlayer.getDuration();
       this.updateStatus(`✅ Loaded: ${file.name} (${duration.toFixed(1)}s) - Click Play to start`);
+      
+      // Initialize progress display
+      this.updateTimeDisplay(0, duration);
+      this.resetProgress();
+      this.updatePlayPauseButton(false); // Reset to play state
+      
       console.log('=== AUDIO FILE LOADED SUCCESSFULLY ===');
       console.log('Duration:', duration, 'seconds');
       console.log('Ready to play!');
@@ -986,7 +1059,87 @@ class MusicVisualizerRenderer {
     }
   }
 
+  private startProgressUpdates(): void {
+    this.stopProgressUpdates(); // Clear any existing interval
+    
+    this.progressUpdateInterval = window.setInterval(() => {
+      if (this.audioPlayer.isCurrentlyPlaying() && this.isAudioLoaded) {
+        const currentTime = this.audioPlayer.getCurrentTime();
+        const duration = this.audioPlayer.getDuration();
+        this.updateProgress(currentTime, duration);
+      }
+    }, 100); // Update every 100ms for smooth progress
+  }
+
+  private stopProgressUpdates(): void {
+    if (this.progressUpdateInterval) {
+      clearInterval(this.progressUpdateInterval);
+      this.progressUpdateInterval = null;
+    }
+  }
+
+  private updateProgress(currentTime: number, duration: number): void {
+    const progressSlider = document.getElementById('progressSlider') as HTMLInputElement;
+    
+    if (progressSlider && duration > 0) {
+      const progressPercent = (currentTime / duration) * 100;
+      progressSlider.value = progressPercent.toString();
+      
+      // Update the visual progress bar background
+      progressSlider.style.background = `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 ${progressPercent}%, rgba(30, 35, 50, 0.8) ${progressPercent}%)`;
+    }
+    
+    this.updateTimeDisplay(currentTime, duration);
+  }
+
+  private updateTimeDisplay(currentTime: number, duration: number): void {
+    const currentTimeEl = document.getElementById('currentTime');
+    const totalTimeEl = document.getElementById('totalTime');
+    
+    if (currentTimeEl) {
+      currentTimeEl.textContent = this.formatTime(currentTime);
+    }
+    
+    if (totalTimeEl) {
+      totalTimeEl.textContent = this.formatTime(duration);
+    }
+  }
+
+  private resetProgress(): void {
+    const progressSlider = document.getElementById('progressSlider') as HTMLInputElement;
+    
+    if (progressSlider) {
+      progressSlider.value = '0';
+      progressSlider.style.background = `linear-gradient(to right, #8b5cf6 0%, #8b5cf6 0%, rgba(30, 35, 50, 0.8) 0%)`;
+    }
+    
+    this.updateTimeDisplay(0, this.audioPlayer.getDuration());
+  }
+
+  private formatTime(seconds: number): string {
+    if (!isFinite(seconds) || seconds < 0) return '0:00';
+    
+    const minutes = Math.floor(seconds / 60);
+    const remainingSeconds = Math.floor(seconds % 60);
+    return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  }
+
+  private updatePlayPauseButton(isPlaying: boolean): void {
+    const playPauseBtn = document.getElementById('playPauseBtn') as HTMLButtonElement;
+    if (playPauseBtn) {
+      if (isPlaying) {
+        playPauseBtn.innerHTML = '⏸ Pause';
+        playPauseBtn.style.background = '#f59e0b';
+      } else {
+        playPauseBtn.innerHTML = '▶ Play';
+        playPauseBtn.style.background = '#10b981';
+      }
+    }
+  }
+
   private destroy(): void {
+    this.stopProgressUpdates();
+    
     if (this.audioPlayer) {
       this.audioPlayer.destroy();
     }

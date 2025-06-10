@@ -11,7 +11,9 @@ export class AudioPlayer {
   private currentTime = 0;
   private duration = 0;
   private onAudioDataCallback: ((audioData: Float32Array) => void) | null = null;
+  private onAudioEndedCallback: (() => void) | null = null;
   private animationFrameId: number | null = null;
+  private isManualStop = false; // Flag to distinguish manual stop from natural ending
 
   constructor() {
     this.initializeAudioContext();
@@ -66,6 +68,7 @@ export class AudioPlayer {
         this.audioBuffer = await this.audioContext.decodeAudioData(arrayBuffer);
         this.duration = this.audioBuffer.duration;
         this.currentTime = 0;
+        this.pauseTime = 0; // Reset pause time for new audio file
         console.log(`Audio loaded successfully: ${this.duration.toFixed(2)}s duration, ${this.audioBuffer.sampleRate}Hz, ${this.audioBuffer.numberOfChannels} channels`);
       }
     } catch (error) {
@@ -111,13 +114,29 @@ export class AudioPlayer {
       
       // Handle playback end
       this.sourceNode.onended = () => {
-        console.log('Audio playback ended naturally');
-        this.stop();
+        console.log('Audio source ended, isManualStop:', this.isManualStop);
+        if (!this.isManualStop) {
+          // Only call stop and callback if this was a natural ending, not a manual pause
+          console.log('Audio playback ended naturally');
+          this.stop();
+          if (this.onAudioEndedCallback) {
+            this.onAudioEndedCallback();
+          }
+        } else {
+          // Reset the flag for next time
+          this.isManualStop = false;
+        }
       };
 
-      // Calculate start offset for resume functionality
-      const offset = this.isPaused ? this.pauseTime : 0;
-      console.log('Starting audio source with offset:', offset);
+      // Calculate start offset for resume/seek functionality
+      // Use pauseTime if it's set (either from pause or seek), otherwise start from beginning
+      const offset = this.pauseTime;
+      console.log('Starting audio source with offset:', offset, {
+        pauseTime: this.pauseTime,
+        isPaused: this.isPaused,
+        audioContextTime: this.audioContext.currentTime,
+        willStartFrom: offset
+      });
       
       // Start the audio source
       this.sourceNode.start(0, offset);
@@ -143,18 +162,32 @@ export class AudioPlayer {
   public pause(): void {
     if (!this.isPlaying || !this.sourceNode || !this.audioContext) return;
 
-    this.pauseTime = this.audioContext.currentTime - this.startTime;
+    // Calculate the current playback position
+    const currentPlaybackTime = this.audioContext.currentTime - this.startTime;
+    this.pauseTime = currentPlaybackTime;
+    
+    console.log('Pausing audio:', {
+      audioContextTime: this.audioContext.currentTime,
+      startTime: this.startTime,
+      calculatedPauseTime: currentPlaybackTime,
+      previousPauseTime: this.pauseTime
+    });
+    
+    // Set flag to indicate this is a manual stop, not a natural ending
+    this.isManualStop = true;
     this.sourceNode.stop();
     this.sourceNode = null;
     this.isPlaying = false;
     this.isPaused = true;
     this.stopAudioAnalysis();
     
-    console.log('Audio playback paused');
+    console.log('Audio playback paused at position:', this.pauseTime);
   }
 
   public stop(): void {
     if (this.sourceNode) {
+      // Set flag to indicate this is a manual stop
+      this.isManualStop = true;
       this.sourceNode.stop();
       this.sourceNode = null;
     }
@@ -177,6 +210,18 @@ export class AudioPlayer {
     
     this.pauseTime = Math.max(0, Math.min(timeInSeconds, this.duration));
     this.currentTime = this.pauseTime;
+    
+    // Set isPaused to true when seeking to maintain the seek position
+    if (!wasPlaying) {
+      this.isPaused = true;
+    }
+    
+    console.log('Seek completed:', {
+      seekTime: timeInSeconds,
+      actualTime: this.pauseTime,
+      wasPlaying,
+      isPaused: this.isPaused
+    });
     
     if (wasPlaying) {
       this.play();
@@ -206,6 +251,10 @@ export class AudioPlayer {
 
   public onAudioData(callback: (audioData: Float32Array) => void): void {
     this.onAudioDataCallback = callback;
+  }
+
+  public onAudioEnded(callback: () => void): void {
+    this.onAudioEndedCallback = callback;
   }
 
   private startAudioAnalysis(): void {
@@ -282,5 +331,6 @@ export class AudioPlayer {
     
     this.audioBuffer = null;
     this.onAudioDataCallback = null;
+    this.onAudioEndedCallback = null;
   }
 } 
