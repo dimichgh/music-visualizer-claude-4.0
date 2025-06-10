@@ -1,0 +1,1000 @@
+import './styles/main.css';
+import { MusicVisualizer } from './visualizers/music-visualizer';
+import { AudioPlayer } from './audio-player';
+
+// Extend the global Window interface to include our electron API
+declare global {
+  interface Window {
+    electronAPI: {
+      audio: {
+        startMicrophoneCapture: () => Promise<any>;
+        loadFile: (filePath: string) => Promise<any>;
+        stop: () => Promise<any>;
+        pause: () => Promise<any>;
+        resume: () => Promise<any>;
+        seek: (position: number) => Promise<any>;
+        getCurrentSource: () => Promise<any>;
+        getConfig: () => Promise<any>;
+        getDuration: () => Promise<any>;
+        getCurrentTime: () => Promise<any>;
+        updateConfig: (config: any) => Promise<any>;
+      };
+      onAudioEvent: (callback: (event: string, data: any) => void) => void;
+      removeAudioListeners: () => void;
+      openFileDialog: () => Promise<any>;
+    };
+  }
+}
+
+class MusicVisualizerRenderer {
+  private audioFeatures: any = null;
+  private isInitialized = false;
+  private isInitializing = false; // Prevent double initialization
+  private visualizer: MusicVisualizer | null = null;
+  private extendedFeatures: any = null;
+  private audioControlsEl!: HTMLDivElement;
+  private featuresDisplayEl!: HTMLDivElement;
+  private visualizerContainerEl!: HTMLDivElement;
+  
+  // Audio playback components
+  private audioPlayer: AudioPlayer;
+  private isAudioLoaded = false;
+  private currentFileName = '';
+
+  constructor() {
+    console.log('=== MUSIC VISUALIZER RENDERER STARTING ===');
+    
+    this.audioPlayer = new AudioPlayer();
+    this.setupAudioPlayerCallbacks();
+    
+    // Initialize after DOM is ready
+    if (document.readyState === 'loading') {
+      console.log('DOM still loading, waiting for DOMContentLoaded...');
+      document.addEventListener('DOMContentLoaded', () => {
+        console.log('DOM loaded, initializing...');
+        this.initialize();
+      });
+    } else {
+      console.log('DOM already loaded, initializing immediately...');
+      this.initialize();
+    }
+    
+    // Add cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      this.destroy();
+    });
+  }
+
+  private setupAudioPlayerCallbacks(): void {
+    // Connect audio player data to our existing audio analysis system
+    this.audioPlayer.onAudioData((audioData: Float32Array) => {
+      console.log('Audio data received for visualization:', {
+        dataLength: audioData.length,
+        sampleData: audioData.slice(0, 5),
+        hasVisualizer: !!this.visualizer
+      });
+      // Process audio data for visualization
+      this.processAudioForVisualization(audioData);
+    });
+  }
+
+  private processAudioForVisualization(audioData: Float32Array): void {
+    // Get frequency data from the audio player
+    const frequencyData = this.audioPlayer.getFrequencyData();
+    
+    console.log('Processing audio for visualization:', {
+      hasFrequencyData: !!frequencyData,
+      frequencyDataLength: frequencyData?.length
+    });
+    
+    if (!frequencyData) return;
+
+    // Create a simplified analysis result for visualization
+    const analysisResult = {
+      features: this.extractBasicFeatures(audioData, frequencyData),
+      frequencyData: {
+        frequencies: new Float32Array(frequencyData.length).map((_, i) => 
+          (i * 24000) / frequencyData.length // Assuming 48kHz sample rate
+        ),
+        amplitudes: new Float32Array(frequencyData.length).map((_, i) => 
+          Math.pow(10, frequencyData[i] / 20) // Convert from dB to linear
+        ),
+        sampleRate: 48000,
+        nyquistFrequency: 24000
+      },
+      timestamp: Date.now()
+    };
+
+    console.log('Analysis result:', {
+      bassLevel: analysisResult.features.bassLevel,
+      midLevel: analysisResult.features.midLevel,
+      trebleLevel: analysisResult.features.trebleLevel,
+      overallLevel: analysisResult.features.overallLevel
+    });
+
+    // Update visualizations
+    this.updateAudioFeatures(analysisResult);
+    this.updateFeaturesDisplay(analysisResult.features);
+  }
+
+  private extractBasicFeatures(timeData: Float32Array, frequencyData: Float32Array): any {
+    // Convert frequency data from dB to linear scale
+    const linearAmplitudes = new Float32Array(frequencyData.length);
+    for (let i = 0; i < frequencyData.length; i++) {
+      linearAmplitudes[i] = Math.pow(10, frequencyData[i] / 20);
+    }
+
+    // Calculate frequency band levels
+    const bassEnd = Math.floor(250 * linearAmplitudes.length / 24000);
+    const midEnd = Math.floor(4000 * linearAmplitudes.length / 24000);
+    
+    let bassLevel = 0, midLevel = 0, trebleLevel = 0;
+    
+    for (let i = 1; i < bassEnd; i++) bassLevel += linearAmplitudes[i];
+    for (let i = bassEnd; i < midEnd; i++) midLevel += linearAmplitudes[i];
+    for (let i = midEnd; i < linearAmplitudes.length; i++) trebleLevel += linearAmplitudes[i];
+    
+    bassLevel /= (bassEnd - 1);
+    midLevel /= (midEnd - bassEnd);
+    trebleLevel /= (linearAmplitudes.length - midEnd);
+
+    // Calculate RMS and overall level
+    let rms = 0;
+    for (let i = 0; i < timeData.length; i++) {
+      rms += timeData[i] * timeData[i];
+    }
+    const overallLevel = Math.sqrt(rms / timeData.length);
+
+    // Find dominant frequency
+    let maxAmplitude = 0;
+    let dominantFrequency = 0;
+    for (let i = 1; i < linearAmplitudes.length; i++) {
+      if (linearAmplitudes[i] > maxAmplitude) {
+        maxAmplitude = linearAmplitudes[i];
+        dominantFrequency = (i * 24000) / linearAmplitudes.length;
+      }
+    }
+
+    // Simple beat detection based on energy
+    const beatDetected = overallLevel > 0.1;
+    const tempo = 120; // Simplified - could be enhanced
+
+    return {
+      bassLevel: Math.min(1.0, bassLevel * 5),
+      midLevel: Math.min(1.0, midLevel * 3),
+      trebleLevel: Math.min(1.0, trebleLevel * 2),
+      overallLevel: Math.min(1.0, overallLevel * 10),
+      beatDetected,
+      tempo,
+      dominantFrequency
+    };
+  }
+
+  private initialize(): void {
+    // Prevent double initialization
+    if (this.isInitialized || this.isInitializing) {
+      console.log('Already initialized or initializing, skipping...');
+      return;
+    }
+    
+    this.isInitializing = true;
+    console.log('=== INITIALIZING MUSIC VISUALIZER RENDERER ===');
+    
+    this.initializeUI();
+    
+    // Set up event listeners after UI is created
+    this.setupEventListeners();
+    
+    // Legacy setup for backwards compatibility
+    this.setupUI();
+    this.setupAudioEventListeners();
+    this.initializeVisualizer();
+    
+    this.isInitialized = true;
+    this.isInitializing = false;
+    console.log('=== MUSIC VISUALIZER RENDERER INITIALIZED ===');
+  }
+
+  private initializeUI(): void {
+    console.log('=== INITIALIZING UI ===');
+    
+    // Clear the existing app content and rebuild with our UI (only if not already cleared)
+    const appEl = document.getElementById('app');
+    if (appEl && appEl.children.length > 0) {
+      console.log('Found app element with content, clearing and rebuilding...');
+      appEl.innerHTML = '';
+    } else if (appEl) {
+      console.log('Found empty app element, proceeding...');
+    }
+
+    // Audio Controls Panel
+    this.audioControlsEl = document.createElement('div');
+    this.audioControlsEl.className = 'audio-controls';
+    this.audioControlsEl.id = 'audio-controls'; // Add ID for debugging
+    this.audioControlsEl.style.cssText = `
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: rgba(20, 25, 40, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 20px;
+      border: 1px solid rgba(100, 120, 200, 0.3);
+      color: #e0e5ff;
+      font-family: 'Inter', sans-serif;
+      min-width: 300px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    `;
+
+    this.audioControlsEl.innerHTML = `
+      <div style="display: flex; align-items: center; margin-bottom: 15px;">
+        <h3 style="margin: 0; color: #8b5cf6; font-size: 16px;">🎵 Music Visualizer</h3>
+      </div>
+      <input type="file" id="fileInput" accept=".wav" style="
+        width: 100%;
+        padding: 8px;
+        margin-bottom: 10px;
+        border: 1px solid rgba(100, 120, 200, 0.5);
+        border-radius: 6px;
+        background: rgba(30, 35, 50, 0.8);
+        color: #e0e5ff;
+        font-size: 12px;
+      ">
+      <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px;">
+        <button id="playBtn" style="padding: 8px; border: none; border-radius: 6px; background: #10b981; color: white; cursor: pointer; font-size: 11px;">▶ Play</button>
+        <button id="pauseBtn" style="padding: 8px; border: none; border-radius: 6px; background: #f59e0b; color: white; cursor: pointer; font-size: 11px;">⏸ Pause</button>
+        <button id="stopBtn" style="padding: 8px; border: none; border-radius: 6px; background: #ef4444; color: white; cursor: pointer; font-size: 11px;">⏹ Stop</button>
+      </div>
+      <div style="margin-bottom: 10px;">
+        <button id="testToneBtn" style="width: 100%; padding: 8px; border: none; border-radius: 6px; background: #6366f1; color: white; cursor: pointer; font-size: 11px;">🔊 Test Audio System</button>
+      </div>
+      <div style="display: flex; align-items: center; margin-bottom: 10px;">
+        <span style="color: #94a3b8; font-size: 11px; margin-right: 8px;">🔊 Volume:</span>
+        <input type="range" id="volumeSlider" min="0" max="100" value="100" style="
+          flex: 1;
+          margin-right: 8px;
+          background: rgba(30, 35, 50, 0.8);
+        ">
+        <span id="volumeDisplay" style="color: #94a3b8; font-size: 11px; min-width: 30px;">100%</span>
+      </div>
+      <div id="status" style="font-size: 11px; color: #94a3b8; margin-bottom: 10px;">Ready - Select a WAV file to begin</div>
+    `;
+
+    console.log('Audio controls panel created');
+
+    // Features Display Panel
+    this.featuresDisplayEl = document.createElement('div');
+    this.featuresDisplayEl.className = 'features-display';
+    this.featuresDisplayEl.id = 'features-display'; // Add ID for debugging
+    this.featuresDisplayEl.style.cssText = `
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 1000;
+      background: rgba(20, 25, 40, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 15px;
+      border: 1px solid rgba(100, 120, 200, 0.3);
+      color: #e0e5ff;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      min-width: 250px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    `;
+
+    this.featuresDisplayEl.innerHTML = `
+      <h4 style="margin: 0 0 10px 0; color: #8b5cf6; font-size: 12px;">🎛 Audio Features</h4>
+      <div id="features-content">No audio loaded</div>
+    `;
+
+    console.log('Features display panel created');
+
+    // Extended Features Panel
+    const extendedFeaturesEl = document.createElement('div');
+    extendedFeaturesEl.className = 'extended-features-panel';
+    extendedFeaturesEl.id = 'extended-features-panel'; // Add ID for debugging
+    extendedFeaturesEl.style.cssText = `
+      position: fixed;
+      bottom: 20px;
+      left: 20px;
+      z-index: 1000;
+      background: rgba(20, 25, 40, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 15px;
+      border: 1px solid rgba(100, 120, 200, 0.3);
+      color: #e0e5ff;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      min-width: 600px;
+      max-height: 300px;
+      overflow-y: auto;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    `;
+    
+    extendedFeaturesEl.innerHTML = `
+      <h4 style="margin: 0 0 10px 0; color: #8b5cf6; font-size: 12px;">🎵 Advanced Audio Analysis</h4>
+      <div class="features-grid" style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+        <div class="instrument-detection">
+          <h5 style="margin: 0 0 5px 0; color: #06b6d4;">🎸 Instruments</h5>
+          <div id="instruments-display">No data available</div>
+        </div>
+        <div class="spectral-features">
+          <h5 style="margin: 0 0 5px 0; color: #10b981;">📊 Spectral</h5>
+          <div id="spectral-display">No data available</div>
+        </div>
+        <div class="musical-analysis">
+          <h5 style="margin: 0 0 5px 0; color: #f59e0b;">🎼 Musical</h5>
+          <div id="musical-display">No data available</div>
+        </div>
+        <div class="dynamic-features">
+          <h5 style="margin: 0 0 5px 0; color: #ef4444;">⚡ Dynamics</h5>
+          <div id="dynamic-display">No data available</div>
+        </div>
+      </div>
+    `;
+
+    console.log('Extended features panel created');
+
+    // 3D Visualizer Container - reuse existing or create new
+    this.visualizerContainerEl = document.getElementById('visualizer-container') as HTMLDivElement;
+    if (!this.visualizerContainerEl) {
+      console.log('Creating new visualizer container');
+      this.visualizerContainerEl = document.createElement('div');
+      this.visualizerContainerEl.id = 'visualizer-container';
+    } else {
+      console.log('Reusing existing visualizer container');
+      this.visualizerContainerEl.innerHTML = ''; // Clear existing content
+    }
+    
+    this.visualizerContainerEl.style.cssText = `
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
+    `;
+
+    console.log('Visualizer container prepared');
+
+    // Add elements to DOM
+    document.body.appendChild(this.visualizerContainerEl);
+    document.body.appendChild(this.audioControlsEl);
+    document.body.appendChild(this.featuresDisplayEl);
+    document.body.appendChild(extendedFeaturesEl);
+
+    console.log('=== UI ELEMENTS ADDED TO DOM ===');
+    console.log('Audio controls element:', !!document.getElementById('audio-controls'));
+    console.log('Test tone button element:', !!document.getElementById('testToneBtn'));
+    console.log('Play button element:', !!document.getElementById('playBtn'));
+  }
+
+  private initializeVisualizer(): void {
+    const visualizerContainer = document.getElementById('visualizer-container');
+    if (visualizerContainer) {
+      // Clear existing content
+      visualizerContainer.innerHTML = '';
+      
+      try {
+        // Create the Three.js visualizer
+        this.visualizer = new MusicVisualizer(visualizerContainer);
+        this.visualizer.start();
+        console.log('3D Music Visualizer initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize 3D visualizer:', error);
+        // Fallback to placeholder
+        visualizerContainer.innerHTML = `
+          <div class="visualizer-placeholder">
+            <h3>3D Visualizer Failed to Load</h3>
+            <p>Using fallback 2D visualization</p>
+            <div id="frequency-display"></div>
+          </div>
+        `;
+      }
+    }
+  }
+
+  private setupUI(): void {
+    const controlsPanel = document.getElementById('controls-panel');
+    if (controlsPanel) {
+      controlsPanel.innerHTML = `
+        <div class="controls-container">
+          <div class="audio-controls">
+            <button id="load-file-btn" class="control-btn">Load Audio File</button>
+            <button id="start-mic-btn" class="control-btn">Start Microphone</button>
+            <button id="stop-btn" class="control-btn">Stop</button>
+            <button id="pause-btn" class="control-btn">Pause</button>
+            <button id="resume-btn" class="control-btn">Resume</button>
+          </div>
+          <div class="audio-info">
+            <div id="current-source">No audio source</div>
+            <div id="audio-features">Waiting for audio data...</div>
+          </div>
+        </div>
+      `;
+
+      this.setupEventListeners();
+    }
+  }
+
+  private setupEventListeners(): void {
+    console.log('=== SETTING UP EVENT LISTENERS ===');
+    
+    // File input handling
+    const fileInput = document.getElementById('fileInput') as HTMLInputElement;
+    console.log('File input element found:', !!fileInput);
+    fileInput?.addEventListener('change', async (event) => {
+      const file = (event.target as HTMLInputElement).files?.[0];
+      if (file) {
+        console.log('File selected:', {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+          isWav: file.name.toLowerCase().endsWith('.wav')
+        });
+        
+        // More lenient file type checking - prioritize file extension
+        const isWavFile = file.name.toLowerCase().endsWith('.wav') || 
+                         file.type.includes('wav') || 
+                         file.type.includes('audio');
+                         
+        if (isWavFile) {
+          await this.loadAudioFile(file);
+        } else {
+          this.updateStatus('❌ Please select a WAV audio file (.wav)');
+          console.error('Invalid file type:', file.type);
+        }
+      }
+    });
+
+    // Audio control buttons
+    const playBtn = document.getElementById('playBtn');
+    const pauseBtn = document.getElementById('pauseBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const testToneBtn = document.getElementById('testToneBtn');
+    
+    console.log('Button elements found:', {
+      playBtn: !!playBtn,
+      pauseBtn: !!pauseBtn,
+      stopBtn: !!stopBtn,
+      testToneBtn: !!testToneBtn
+    });
+    
+    if (!playBtn || !pauseBtn || !stopBtn || !testToneBtn) {
+      console.error('Missing button elements! DOM may not be ready yet.');
+      console.log('DOM state:', {
+        audioControlsInDOM: !!document.getElementById('audio-controls'),
+        allButtons: {
+          play: document.getElementById('playBtn'),
+          pause: document.getElementById('pauseBtn'),
+          stop: document.getElementById('stopBtn'),
+          test: document.getElementById('testToneBtn')
+        }
+      });
+    }
+    
+    playBtn?.addEventListener('click', async () => {
+      console.log('=== PLAY BUTTON CLICKED ===');
+      console.log('System state:', {
+        isAudioLoaded: this.isAudioLoaded,
+        currentFileName: this.currentFileName,
+        audioPlayerExists: !!this.audioPlayer,
+        visualizerExists: !!this.visualizer
+      });
+      
+      if (this.isAudioLoaded) {
+        try {
+          console.log('Attempting to start audio playback...');
+          this.updateStatus('🎵 Starting playback...');
+          
+          await this.audioPlayer.play();
+          
+          console.log('AudioPlayer.play() completed successfully');
+          this.updateStatus('🎵 Playing audio - Listen for sound!');
+          
+          // Verify playback state
+          setTimeout(() => {
+            const isPlaying = this.audioPlayer.isCurrentlyPlaying();
+            console.log('Playback verification:', {
+              isCurrentlyPlaying: isPlaying,
+              currentTime: this.audioPlayer.getCurrentTime(),
+              duration: this.audioPlayer.getDuration()
+            });
+            
+            if (!isPlaying) {
+              console.error('Audio should be playing but isCurrentlyPlaying() returns false');
+              this.updateStatus('⚠️ Audio may not be playing - Check console for details');
+            }
+          }, 500);
+          
+        } catch (error) {
+          console.error('=== PLAY BUTTON ERROR ===');
+          console.error('Playback failed:', error);
+          this.updateStatus(`❌ Playback error: ${error instanceof Error ? error.message : 'Unknown error'}`);
+        }
+      } else {
+        console.log('No audio file loaded');
+        this.updateStatus('⚠️ No audio file loaded - Please select a WAV file first');
+      }
+    });
+
+    pauseBtn?.addEventListener('click', () => {
+      console.log('Pause button clicked');
+      this.audioPlayer.pause();
+      this.updateStatus('Audio paused');
+    });
+
+    stopBtn?.addEventListener('click', () => {
+      console.log('Stop button clicked');
+      this.audioPlayer.stop();
+      this.updateStatus('Audio stopped');
+    });
+
+    // Test tone button
+    testToneBtn?.addEventListener('click', async () => {
+      console.log('=== TEST TONE BUTTON CLICKED ===');
+      await this.playTestTone();
+    });
+    
+    // Confirm event listeners are attached
+    const attachedListeners = {
+      fileInput: !!fileInput,
+      playBtn: !!playBtn,
+      pauseBtn: !!pauseBtn,
+      stopBtn: !!stopBtn,
+      testToneBtn: !!testToneBtn
+    };
+    
+    console.log('=== EVENT LISTENERS ATTACHED ===', attachedListeners);
+    
+    if (Object.values(attachedListeners).every(v => v)) {
+      console.log('✅ All event listeners successfully attached!');
+    } else {
+      console.error('❌ Some event listeners failed to attach!', attachedListeners);
+    }
+
+    // Volume control
+    const volumeSlider = document.getElementById('volumeSlider') as HTMLInputElement;
+    const volumeDisplay = document.getElementById('volumeDisplay') as HTMLSpanElement;
+    
+    volumeSlider?.addEventListener('input', (event) => {
+      const volume = parseInt((event.target as HTMLInputElement).value);
+      const volumeNormalized = volume / 100;
+      this.audioPlayer.setVolume(volumeNormalized);
+      
+      if (volumeDisplay) {
+        volumeDisplay.textContent = `${volume}%`;
+      }
+    });
+
+    // Legacy button handlers for compatibility
+    document.getElementById('load-file-btn')?.addEventListener('click', async () => {
+      try {
+        const result = await window.electronAPI.openFileDialog();
+        if (result.success && !result.canceled) {
+          console.log('Loading file:', result.filePath);
+          const loadResult = await window.electronAPI.audio.loadFile(result.filePath);
+          if (loadResult.success) {
+            this.updateStatus('File loaded successfully');
+          } else {
+            this.updateStatus(`Error loading file: ${loadResult.error}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error loading file:', error);
+        this.updateStatus('Error opening file dialog');
+      }
+    });
+
+    document.getElementById('start-mic-btn')?.addEventListener('click', async () => {
+      try {
+        const result = await window.electronAPI.audio.startMicrophoneCapture();
+        if (result.success) {
+          this.updateStatus('Microphone started');
+        } else {
+          this.updateStatus(`Microphone error: ${result.error}`);
+        }
+      } catch (error) {
+        console.error('Error starting microphone:', error);
+        this.updateStatus('Error starting microphone');
+      }
+    });
+
+    document.getElementById('pause-btn')?.addEventListener('click', async () => {
+      await window.electronAPI.audio.pause();
+      this.updateStatus('Audio paused');
+    });
+
+    document.getElementById('resume-btn')?.addEventListener('click', async () => {
+      await window.electronAPI.audio.resume();
+      this.updateStatus('Audio resumed');
+    });
+  }
+
+  private async playTestTone(): Promise<void> {
+    console.log('=== TEST TONE BUTTON CLICKED ===');
+    console.log('Starting audio system test...');
+    
+    try {
+      this.updateStatus('🔊 Testing audio system...');
+      
+      // Try to use the existing audio player's context first, fall back to new context
+      let testContext: AudioContext;
+      
+      if (this.audioPlayer && (this.audioPlayer as any).audioContext) {
+        console.log('Using existing audio context from AudioPlayer');
+        testContext = (this.audioPlayer as any).audioContext;
+      } else {
+        console.log('Creating new audio context for test tone');
+        testContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+      }
+      
+      console.log('Test context state:', testContext.state);
+      console.log('Test context sample rate:', testContext.sampleRate);
+      
+      // Ensure audio context is running
+      if (testContext.state === 'suspended') {
+        console.log('Audio context is suspended, attempting to resume...');
+        await testContext.resume();
+        console.log('Audio context resumed, new state:', testContext.state);
+      }
+      
+      if (testContext.state !== 'running') {
+        throw new Error(`Audio context failed to start (state: ${testContext.state})`);
+      }
+      
+      console.log('Creating oscillator and gain nodes...');
+      
+      // Create oscillator for test tone
+      const oscillator = testContext.createOscillator();
+      const gainNode = testContext.createGain();
+      
+      // Connect nodes
+      oscillator.connect(gainNode);
+      gainNode.connect(testContext.destination);
+      
+      // Configure test tone (440Hz A note)
+      oscillator.frequency.setValueAtTime(440, testContext.currentTime);
+      oscillator.type = 'sine';
+      
+      console.log('Setting up tone envelope...');
+      
+      // Create envelope (fade in/out to avoid clicks)
+      const now = testContext.currentTime;
+      const fadeTime = 0.05; // 50ms fade
+      const duration = 1.0; // 1 second total
+      
+      gainNode.gain.setValueAtTime(0, now);
+      gainNode.gain.linearRampToValueAtTime(0.15, now + fadeTime); // Fade in
+      gainNode.gain.linearRampToValueAtTime(0.15, now + duration - fadeTime); // Hold
+      gainNode.gain.linearRampToValueAtTime(0, now + duration); // Fade out
+      
+      console.log('Starting oscillator...');
+      console.log('Tone will play from', now, 'to', now + duration);
+      
+      // Set up completion handler
+      let completed = false;
+      const cleanup = () => {
+        if (!completed) {
+          completed = true;
+          console.log('=== TEST TONE COMPLETED ===');
+          
+          // Close context only if we created it
+          if (!(this.audioPlayer && (this.audioPlayer as any).audioContext === testContext)) {
+            console.log('Closing temporary test context');
+            testContext.close();
+          }
+          
+          this.updateStatus('✅ Audio test completed - You should have heard a 1-second tone at 440Hz');
+        }
+      };
+      
+      oscillator.onended = cleanup;
+      
+      // Start the oscillator
+      oscillator.start(now);
+      oscillator.stop(now + duration);
+      
+      console.log('Test tone started successfully');
+      this.updateStatus('🎵 Playing test tone (440Hz for 1 second)...');
+      
+      // Fallback timeout in case onended doesn't fire
+      setTimeout(() => {
+        cleanup();
+      }, duration * 1000 + 500); // Add 500ms buffer
+      
+    } catch (error) {
+      console.error('=== TEST TONE FAILED ===');
+      console.error('Error details:', error);
+      console.error('Error type:', error?.constructor?.name);
+      console.error('Error message:', error instanceof Error ? error.message : String(error));
+      
+      let errorMessage = 'Unknown audio error';
+      if (error instanceof Error) {
+        errorMessage = error.message;
+      }
+      
+      if (errorMessage.includes('suspended') || errorMessage.includes('not allowed')) {
+        this.updateStatus('❌ Audio blocked by browser - Try clicking in the app first, then test again');
+      } else if (errorMessage.includes('context')) {
+        this.updateStatus('❌ Audio context error - Your browser may not support Web Audio API');
+      } else {
+        this.updateStatus(`❌ Audio test failed: ${errorMessage}`);
+      }
+    }
+  }
+
+  private async loadAudioFile(file: File): Promise<void> {
+    try {
+      this.updateStatus('Loading audio file...');
+      
+      console.log('=== LOADING AUDIO FILE ===');
+      console.log('File details:', {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        lastModified: new Date(file.lastModified)
+      });
+      
+      // Basic validation - just check file extension and size
+      if (!file.name.toLowerCase().endsWith('.wav')) {
+        throw new Error('Please select a WAV audio file (.wav extension required)');
+      }
+      
+      // Check file size (limit to 100MB for performance)
+      const maxSize = 100 * 1024 * 1024; // 100MB
+      if (file.size > maxSize) {
+        throw new Error('File too large. Please select a file smaller than 100MB');
+      }
+      
+      if (file.size < 1000) { // Less than 1KB
+        throw new Error('File too small. Please select a valid audio file');
+      }
+      
+      // Read file as ArrayBuffer
+      console.log('Reading file as ArrayBuffer...');
+      const arrayBuffer = await file.arrayBuffer();
+      console.log('ArrayBuffer created successfully, size:', arrayBuffer.byteLength);
+      
+      // Load into AudioPlayer
+      console.log('Loading into AudioPlayer...');
+      await this.audioPlayer.loadAudioFile(arrayBuffer);
+      
+      this.isAudioLoaded = true;
+      this.currentFileName = file.name;
+      
+      const duration = this.audioPlayer.getDuration();
+      this.updateStatus(`✅ Loaded: ${file.name} (${duration.toFixed(1)}s) - Click Play to start`);
+      console.log('=== AUDIO FILE LOADED SUCCESSFULLY ===');
+      console.log('Duration:', duration, 'seconds');
+      console.log('Ready to play!');
+      
+    } catch (error) {
+      console.error('=== AUDIO FILE LOADING FAILED ===');
+      console.error('Error details:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error loading audio file';
+      this.updateStatus(`❌ Error: ${errorMessage}`);
+      this.isAudioLoaded = false;
+    }
+  }
+
+  private setupAudioEventListeners(): void {
+    // Listen for all audio events
+    window.electronAPI.onAudioEvent((event: string, data: any) => {
+      switch (event) {
+        case 'source-changed':
+          this.updateCurrentSource(data);
+          break;
+        case 'features-extracted':
+          this.updateAudioFeatures(data);
+          this.updateFeaturesDisplay(data.features);
+          break;
+        case 'extended-features-extracted':
+          this.extendedFeatures = data;
+          this.updateExtendedFeaturesDisplay();
+          break;
+        case 'data-available':
+          // Handle raw audio data if needed
+          break;
+        case 'error':
+          this.updateStatus(`Audio error: ${data.message}`);
+          break;
+      }
+    });
+  }
+
+  private updateCurrentSource(source: any): void {
+    const sourceElement = document.getElementById('current-source');
+    if (sourceElement && source) {
+      sourceElement.textContent = `Source: ${source.name} (${source.type})`;
+    }
+  }
+
+  private updateAudioFeatures(analysisResult: any): void {
+    this.audioFeatures = analysisResult;
+    
+    // Update the 3D visualizer with audio features
+    if (this.visualizer && analysisResult?.features) {
+      this.visualizer.updateAudioFeatures(analysisResult.features);
+    }
+
+    const featuresElement = document.getElementById('audio-features');
+    if (featuresElement && analysisResult?.features) {
+      const features = analysisResult.features;
+      featuresElement.innerHTML = `
+        <div class="features-grid">
+          <span>Bass: ${features.bassLevel.toFixed(3)}</span>
+          <span>Mid: ${features.midLevel.toFixed(3)}</span>
+          <span>Treble: ${features.trebleLevel.toFixed(3)}</span>
+          <span>Overall: ${features.overallLevel.toFixed(3)}</span>
+          <span>Beat: ${features.beatDetected ? 'Yes' : 'No'}</span>
+          <span>Tempo: ${features.tempo.toFixed(1)} BPM</span>
+        </div>
+      `;
+    }
+
+    // Fallback frequency visualization if 3D failed
+    this.updateFrequencyDisplay(analysisResult?.frequencyData);
+  }
+
+  private updateFrequencyDisplay(frequencyData: any): void {
+    const displayElement = document.getElementById('frequency-display');
+    if (displayElement && frequencyData?.amplitudes) {
+      // Create a simple bar visualization
+      const amplitudes = frequencyData.amplitudes;
+      const barCount = Math.min(32, amplitudes.length); // Show first 32 frequency bins
+      const maxHeight = 50;
+
+      let html = '<div class="frequency-bars">';
+      for (let i = 0; i < barCount; i++) {
+        const height = Math.min(amplitudes[i] * 1000, maxHeight); // Scale for visibility
+        html += `<div class="freq-bar" style="height: ${height}px"></div>`;
+      }
+      html += '</div>';
+
+      displayElement.innerHTML = html;
+    }
+  }
+
+  private updateExtendedFeaturesDisplay(): void {
+    if (!this.extendedFeatures) return;
+
+    // Update instrument detection display
+    const instrumentsEl = document.getElementById('instruments-display');
+    if (instrumentsEl && this.extendedFeatures.instrumentDetection) {
+      const instruments = this.extendedFeatures.instrumentDetection;
+      instrumentsEl.innerHTML = `
+        <div style="line-height: 1.3;">
+          🥁 Drums: ${this.formatPercentage(instruments.drums)}
+          🎸 Guitar: ${this.formatPercentage(instruments.guitar)}
+          🎵 Bass: ${this.formatPercentage(instruments.bass)}
+          🎤 Vocals: ${this.formatPercentage(instruments.vocals)}
+          🎹 Piano: ${this.formatPercentage(instruments.piano)}
+          🎻 Strings: ${this.formatPercentage(instruments.strings)}
+        </div>
+      `;
+    }
+
+    // Update spectral features display
+    const spectralEl = document.getElementById('spectral-display');
+    if (spectralEl) {
+      spectralEl.innerHTML = `
+        <div style="line-height: 1.3;">
+          Centroid: ${this.formatFrequency(this.extendedFeatures.spectralCentroid)}
+          Rolloff: ${this.formatFrequency(this.extendedFeatures.spectralRolloff)}
+          Flux: ${this.formatNumber(this.extendedFeatures.spectralFlux)}
+          ZCR: ${this.formatNumber(this.extendedFeatures.zeroCrossingRate)}
+        </div>
+      `;
+    }
+
+    // Update musical analysis display
+    const musicalEl = document.getElementById('musical-display');
+    if (musicalEl) {
+      musicalEl.innerHTML = `
+        <div style="line-height: 1.3;">
+          Key: ${this.extendedFeatures.musicalKey || 'Unknown'}
+          Time: ${this.extendedFeatures.timeSignature || '4/4'}
+          Complexity: ${this.formatPercentage(this.extendedFeatures.rhythmComplexity)}
+          Beat Strength: ${this.formatPercentage(this.extendedFeatures.beatStrength)}
+          Tempo Stability: ${this.formatPercentage(this.extendedFeatures.tempoStability)}
+        </div>
+      `;
+    }
+
+    // Update dynamic features display
+    const dynamicEl = document.getElementById('dynamic-display');
+    if (dynamicEl) {
+      dynamicEl.innerHTML = `
+        <div style="line-height: 1.3;">
+          RMS: ${this.formatNumber(this.extendedFeatures.rms)}
+          Peak: ${this.formatNumber(this.extendedFeatures.peak)}
+          Dynamic Range: ${this.formatNumber(this.extendedFeatures.dynamicRange)}
+          ${this.extendedFeatures.onsetDetection ? '🎯 Onset!' : ''}
+        </div>
+      `;
+    }
+  }
+
+  private updateFeaturesDisplay(features: any): void {
+    const featuresContent = document.getElementById('features-content');
+    if (featuresContent && features) {
+      featuresContent.innerHTML = `
+        <div style="line-height: 1.4;">
+          <div style="margin-bottom: 8px;">
+            <span style="color: #ef4444;">🔴 Bass:</span> ${features.bassLevel.toFixed(3)}
+            <span style="color: #10b981; margin-left: 10px;">🟢 Mid:</span> ${features.midLevel.toFixed(3)}
+            <span style="color: #3b82f6; margin-left: 10px;">🔵 Treble:</span> ${features.trebleLevel.toFixed(3)}
+          </div>
+          <div style="margin-bottom: 8px;">
+            <span style="color: #8b5cf6;">📊 Overall:</span> ${features.overallLevel.toFixed(3)}
+            <span style="color: #f59e0b; margin-left: 10px;">🎵 Dominant:</span> ${Math.round(features.dominantFrequency)} Hz
+          </div>
+          <div>
+            <span style="color: ${features.beatDetected ? '#10b981' : '#6b7280'};">
+              ${features.beatDetected ? '🥁 Beat!' : '⚪ No Beat'}
+            </span>
+            <span style="color: #06b6d4; margin-left: 10px;">⏱ Tempo:</span> ${features.tempo.toFixed(1)} BPM
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  // Helper formatting functions
+  private formatPercentage(value: number | undefined): string {
+    if (value === undefined) return '0%';
+    return `${Math.round(value * 100)}%`;
+  }
+
+  private formatFrequency(value: number | undefined): string {
+    if (value === undefined) return '0 Hz';
+    if (value > 1000) {
+      return `${(value / 1000).toFixed(1)}k Hz`;
+    }
+    return `${Math.round(value)} Hz`;
+  }
+
+  private formatNumber(value: number | undefined): string {
+    if (value === undefined) return '0';
+    if (value < 0.01) {
+      return value.toExponential(2);
+    }
+    return value.toFixed(3);
+  }
+
+  private updateStatus(message: string): void {
+    console.log('Status:', message);
+    
+    const statusElement = document.getElementById('status');
+    if (statusElement) {
+      statusElement.textContent = message;
+      statusElement.style.color = '#94a3b8'; // Default color
+      
+      // Add color coding for different message types
+      if (message.includes('Error') || message.includes('Failed')) {
+        statusElement.style.color = '#ef4444'; // Red for errors
+      } else if (message.includes('Playing') || message.includes('Loaded')) {
+        statusElement.style.color = '#10b981'; // Green for success
+      } else if (message.includes('Paused') || message.includes('Stopped')) {
+        statusElement.style.color = '#f59e0b'; // Orange for paused/stopped
+      }
+    }
+  }
+
+  private destroy(): void {
+    if (this.audioPlayer) {
+      this.audioPlayer.destroy();
+    }
+    
+    if (this.visualizer) {
+      // Add cleanup if visualizer has destroy method
+    }
+  }
+}
+
+new MusicVisualizerRenderer();
