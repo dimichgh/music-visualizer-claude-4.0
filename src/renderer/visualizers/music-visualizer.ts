@@ -2,12 +2,14 @@ import * as THREE from 'three';
 import { SceneManager } from './scene-manager';
 import { ParticleSystem } from './particle-system';
 import { CosmicEffectsManager, AudioData } from './cosmic-effects/CosmicEffectsManager';
+import { InstrumentAvatarManager } from './instrument-avatars/InstrumentAvatarManager';
 import { GraphicsConfig, ParticleSystemConfig } from '@shared/types/visualizer';
 
 export class MusicVisualizer {
   private sceneManager!: SceneManager;
   private particleSystems: ParticleSystem[] = [];
   private cosmicEffects!: CosmicEffectsManager;
+  private avatarManager!: InstrumentAvatarManager;
   private audioFeatures: any = null;
   private isInitialized = false;
 
@@ -77,7 +79,10 @@ export class MusicVisualizer {
     const camera = this.sceneManager.getCamera();
     this.cosmicEffects = new CosmicEffectsManager(scene, camera);
     
-    console.log('Cosmic effects system initialized!');
+    // Initialize the instrument avatar manager
+    this.avatarManager = new InstrumentAvatarManager(scene, camera);
+    
+    console.log('Cosmic effects and avatar systems initialized!');
   }
 
   private createStarField(): void {
@@ -120,6 +125,12 @@ export class MusicVisualizer {
     if (this.audioFeatures && this.cosmicEffects) {
       const audioData: AudioData = this.convertToAudioData(this.audioFeatures);
       this.cosmicEffects.updateAudioFeatures(audioData);
+    }
+
+    // Update instrument avatars with audio data
+    if (this.audioFeatures && this.avatarManager) {
+      const audioData: AudioData = this.convertToAudioData(this.audioFeatures);
+      this.avatarManager.updateAudioFeatures(audioData);
     }
 
     // Camera movement based on audio
@@ -177,10 +188,17 @@ export class MusicVisualizer {
     return this.cosmicEffects;
   }
 
+  public getAvatarManager() {
+    return this.avatarManager;
+  }
+
   public dispose(): void {
     this.particleSystems.forEach(system => system.dispose());
     if (this.cosmicEffects) {
       this.cosmicEffects.cleanup();
+    }
+    if (this.avatarManager) {
+      this.avatarManager.cleanup();
     }
     this.sceneManager.dispose();
   }

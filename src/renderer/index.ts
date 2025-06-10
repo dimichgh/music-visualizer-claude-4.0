@@ -488,6 +488,108 @@ class MusicVisualizerRenderer {
 
     console.log('Cosmic effects panel created');
 
+    // Instrument Avatars Controls Panel 
+    const avatarControlsEl = document.createElement('div');
+    avatarControlsEl.className = 'avatar-controls-panel';
+    avatarControlsEl.id = 'avatar-controls-panel';
+    avatarControlsEl.style.cssText = `
+      position: fixed;
+      bottom: 350px;
+      right: 20px;
+      z-index: 1000;
+      background: rgba(20, 25, 40, 0.95);
+      backdrop-filter: blur(10px);
+      border-radius: 12px;
+      padding: 15px;
+      border: 1px solid rgba(100, 120, 200, 0.3);
+      color: #e0e5ff;
+      font-family: 'Courier New', monospace;
+      font-size: 11px;
+      min-width: 280px;
+      box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    `;
+    
+    avatarControlsEl.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px;">
+        <h4 style="margin: 0; color: #8b5cf6; font-size: 12px;">🎭 Instrument Avatars</h4>
+        <button id="avatar-controls-pin" class="pin-button" style="
+          background: none;
+          border: none;
+          color: #6b7280;
+          cursor: pointer;
+          font-size: 12px;
+          padding: 4px;
+          border-radius: 4px;
+          transition: color 0.2s;
+        " title="Pin/Unpin Panel">📌</button>
+      </div>
+      <div class="avatar-toggles" style="display: grid; gap: 8px;">
+        <label style="display: flex; align-items: center; cursor: pointer;">
+          <input type="checkbox" id="drums-avatar-enabled" checked style="margin-right: 8px; accent-color: #ef4444;">
+          <span style="color: #e0e5ff;">🥁 Drums Avatar</span>
+        </label>
+        <label style="display: flex; align-items: center; cursor: pointer;">
+          <input type="checkbox" id="guitar-avatar-enabled" checked style="margin-right: 8px; accent-color: #22c55e;">
+          <span style="color: #e0e5ff;">🎸 Guitar Avatar</span>
+        </label>
+        <label style="display: flex; align-items: center; cursor: pointer;">
+          <input type="checkbox" id="bass-avatar-enabled" checked style="margin-right: 8px; accent-color: #3b82f6;">
+          <span style="color: #e0e5ff;">🎵 Bass Avatar</span>
+        </label>
+        <label style="display: flex; align-items: center; cursor: pointer;">
+          <input type="checkbox" id="vocals-avatar-enabled" checked style="margin-right: 8px; accent-color: #facc15;">
+          <span style="color: #e0e5ff;">🎤 Vocals Avatar</span>
+        </label>
+        <label style="display: flex; align-items: center; cursor: pointer;">
+          <input type="checkbox" id="piano-avatar-enabled" checked style="margin-right: 8px; accent-color: #ec4899;">
+          <span style="color: #e0e5ff;">🎹 Piano Avatar</span>
+        </label>
+        <label style="display: flex; align-items: center; cursor: pointer;">
+          <input type="checkbox" id="strings-avatar-enabled" checked style="margin-right: 8px; accent-color: #06b6d4;">
+          <span style="color: #e0e5ff;">🎻 Strings Avatar</span>
+        </label>
+      </div>
+      <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(100, 120, 200, 0.2);">
+        <div style="display: flex; align-items: center; margin-bottom: 8px;">
+          <span style="color: #94a3b8; font-size: 10px; margin-right: 8px;">Opacity:</span>
+          <input type="range" id="avatar-opacity" min="0" max="100" value="80" style="
+            flex: 1;
+            margin-right: 8px;
+            accent-color: #8b5cf6;
+          ">
+          <span id="avatar-opacity-display" style="color: #94a3b8; font-size: 10px; min-width: 30px;">80%</span>
+        </div>
+        <div style="display: flex; align-items: center;">
+          <span style="color: #94a3b8; font-size: 10px; margin-right: 8px;">Movement:</span>
+          <input type="range" id="avatar-movement" min="0" max="100" value="70" style="
+            flex: 1;
+            margin-right: 8px;
+            accent-color: #06b6d4;
+          ">
+          <span id="avatar-movement-display" style="color: #94a3b8; font-size: 10px; min-width: 30px;">70%</span>
+        </div>
+      </div>
+      <div style="margin-top: 15px; padding-top: 10px; border-top: 1px solid rgba(100, 120, 200, 0.2);">
+        <h5 style="margin: 0 0 8px 0; color: #94a3b8; font-size: 10px;">👻 Avatar Status</h5>
+        <div id="avatar-status" style="font-size: 9px; line-height: 1.3; color: #6b7280;">
+          No instrument detection data
+        </div>
+      </div>
+      <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(100, 120, 200, 0.2);">
+        <h5 style="margin: 0 0 8px 0; color: #94a3b8; font-size: 10px;">🧪 Test Avatars</h5>
+        <div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px;">
+          <button id="test-drums-avatar" style="padding: 4px; border: none; border-radius: 4px; background: #ef4444; color: white; cursor: pointer; font-size: 9px;">🥁</button>
+          <button id="test-guitar-avatar" style="padding: 4px; border: none; border-radius: 4px; background: #22c55e; color: white; cursor: pointer; font-size: 9px;">🎸</button>
+          <button id="test-bass-avatar" style="padding: 4px; border: none; border-radius: 4px; background: #3b82f6; color: white; cursor: pointer; font-size: 9px;">🎵</button>
+          <button id="test-vocals-avatar" style="padding: 4px; border: none; border-radius: 4px; background: #facc15; color: white; cursor: pointer; font-size: 9px;">🎤</button>
+          <button id="test-piano-avatar" style="padding: 4px; border: none; border-radius: 4px; background: #ec4899; color: white; cursor: pointer; font-size: 9px;">🎹</button>
+          <button id="test-strings-avatar" style="padding: 4px; border: none; border-radius: 4px; background: #06b6d4; color: white; cursor: pointer; font-size: 9px;">🎻</button>
+        </div>
+      </div>
+    `;
+
+    console.log('Avatar controls panel created');
+
     // 3D Visualizer Container - reuse existing or create new
     this.visualizerContainerEl = document.getElementById('visualizer-container') as HTMLDivElement;
     if (!this.visualizerContainerEl) {
@@ -517,6 +619,7 @@ class MusicVisualizerRenderer {
     document.body.appendChild(this.featuresDisplayEl);
     document.body.appendChild(extendedFeaturesEl);
     document.body.appendChild(cosmicEffectsEl);
+    document.body.appendChild(avatarControlsEl);
 
     console.log('=== UI ELEMENTS ADDED TO DOM ===');
     console.log('Audio controls element:', !!document.getElementById('audio-controls'));
@@ -721,6 +824,9 @@ class MusicVisualizerRenderer {
 
     // Setup cosmic effects controls
     this.setupCosmicEffectsControls();
+    
+    // Setup avatar controls
+    this.setupAvatarControls();
     
     // Setup smart UI auto-hide functionality
     this.setupSmartUIHiding();
@@ -1046,6 +1152,9 @@ class MusicVisualizerRenderer {
     // Update cosmic effects status display
     this.updateCosmicEffectsStatus(analysisResult?.features);
 
+    // Update avatar status display
+    this.updateAvatarStatus(analysisResult?.features);
+
     // Fallback frequency visualization if 3D failed
     this.updateFrequencyDisplay(analysisResult?.frequencyData);
   }
@@ -1080,6 +1189,55 @@ class MusicVisualizerRenderer {
     const fpsColor = performanceInfo.avgFPS > 50 ? '#10b981' : 
                      performanceInfo.avgFPS > 30 ? '#f59e0b' : '#ef4444';
     statusLines.push(`<span style="color: ${fpsColor};">⚡ ${performanceInfo.avgFPS} FPS</span>`);
+
+    statusElement.innerHTML = statusLines.join('<br>');
+  }
+
+  private updateAvatarStatus(features: any): void {
+    const statusElement = document.getElementById('avatar-status');
+    if (!statusElement || !this.visualizer) return;
+
+    const avatarManager = (this.visualizer as any).getAvatarManager?.();
+    if (!avatarManager) {
+      statusElement.innerHTML = 'Avatar system not initialized';
+      return;
+    }
+
+    const performanceInfo = avatarManager.getPerformanceInfo();
+    const activeAvatars = avatarManager.getActiveAvatars();
+
+    if (!performanceInfo || !activeAvatars) {
+      statusElement.innerHTML = 'Status unavailable';
+      return;
+    }
+
+    const statusLines = [
+      `👻 Active: ${performanceInfo.activeAvatars}/6 avatars`,
+      `🔺 Vertices: ${performanceInfo.totalVertices}`,
+      `⚡ Orbit radius: ${performanceInfo.orbitRadius}m`
+    ];
+
+    // Show which avatars are currently active
+    const activeList = Object.entries(activeAvatars)
+      .filter(([_, active]) => active)
+      .map(([name, _]) => {
+        const emoji = {
+          drums: '🥁',
+          guitar: '🎸', 
+          bass: '🎵',
+          vocals: '🎤',
+          piano: '🎹',
+          strings: '🎻'
+        }[name] || '🎭';
+        return emoji;
+      })
+      .join(' ');
+
+    if (activeList) {
+      statusLines.push(`🎭 Visible: ${activeList}`);
+    } else {
+      statusLines.push('💭 No avatars currently visible');
+    }
 
     statusElement.innerHTML = statusLines.join('<br>');
   }
@@ -1410,6 +1568,138 @@ class MusicVisualizerRenderer {
     console.log('Cosmic effects controls setup complete');
   }
 
+  private setupAvatarControls(): void {
+    console.log('Setting up avatar controls...');
+
+    // Avatar toggles
+    const drumsCheckbox = document.getElementById('drums-avatar-enabled') as HTMLInputElement;
+    const guitarCheckbox = document.getElementById('guitar-avatar-enabled') as HTMLInputElement;
+    const bassCheckbox = document.getElementById('bass-avatar-enabled') as HTMLInputElement;
+    const vocalsCheckbox = document.getElementById('vocals-avatar-enabled') as HTMLInputElement;
+    const pianoCheckbox = document.getElementById('piano-avatar-enabled') as HTMLInputElement;
+    const stringsCheckbox = document.getElementById('strings-avatar-enabled') as HTMLInputElement;
+
+    // Avatar sliders
+    const opacitySlider = document.getElementById('avatar-opacity') as HTMLInputElement;
+    const movementSlider = document.getElementById('avatar-movement') as HTMLInputElement;
+    const opacityDisplay = document.getElementById('avatar-opacity-display') as HTMLSpanElement;
+    const movementDisplay = document.getElementById('avatar-movement-display') as HTMLSpanElement;
+
+    // Function to update avatar configuration
+    const updateAvatarConfig = () => {
+      if (this.visualizer) {
+        const avatarManager = (this.visualizer as any).getAvatarManager?.();
+        if (avatarManager) {
+          const config = {
+            masterEnabled: true,
+            globalOpacity: (opacitySlider?.value ? parseInt(opacitySlider.value) : 80) / 100,
+            movementSpeed: (movementSlider?.value ? parseInt(movementSlider.value) : 70) / 100,
+            avatars: {
+              drums: { enabled: drumsCheckbox?.checked ?? true, opacity: 0.8, scale: 1.0, movementSpeed: 1.2, particleIntensity: 0.7 },
+              guitar: { enabled: guitarCheckbox?.checked ?? true, opacity: 0.7, scale: 1.0, movementSpeed: 1.0, particleIntensity: 0.6 },
+              bass: { enabled: bassCheckbox?.checked ?? true, opacity: 0.8, scale: 1.2, movementSpeed: 0.8, particleIntensity: 0.8 },
+              vocals: { enabled: vocalsCheckbox?.checked ?? true, opacity: 0.6, scale: 1.1, movementSpeed: 1.1, particleIntensity: 0.9 },
+              piano: { enabled: pianoCheckbox?.checked ?? true, opacity: 0.7, scale: 1.0, movementSpeed: 0.9, particleIntensity: 0.5 },
+              strings: { enabled: stringsCheckbox?.checked ?? true, opacity: 0.6, scale: 0.9, movementSpeed: 1.0, particleIntensity: 0.7 }
+            }
+          };
+          
+          avatarManager.updateConfiguration(config);
+          console.log('Avatar config updated:', config);
+        }
+      }
+    };
+
+    // Add event listeners for checkboxes
+    drumsCheckbox?.addEventListener('change', updateAvatarConfig);
+    guitarCheckbox?.addEventListener('change', updateAvatarConfig);
+    bassCheckbox?.addEventListener('change', updateAvatarConfig);
+    vocalsCheckbox?.addEventListener('change', updateAvatarConfig);
+    pianoCheckbox?.addEventListener('change', updateAvatarConfig);
+    stringsCheckbox?.addEventListener('change', updateAvatarConfig);
+
+    // Add event listeners for sliders
+    opacitySlider?.addEventListener('input', (event) => {
+      const value = (event.target as HTMLInputElement).value;
+      if (opacityDisplay) {
+        opacityDisplay.textContent = `${value}%`;
+      }
+      updateAvatarConfig();
+    });
+
+    movementSlider?.addEventListener('input', (event) => {
+      const value = (event.target as HTMLInputElement).value;
+      if (movementDisplay) {
+        movementDisplay.textContent = `${value}%`;
+      }
+      updateAvatarConfig();
+    });
+
+    // Test avatar buttons
+    const testDrums = document.getElementById('test-drums-avatar');
+    const testGuitar = document.getElementById('test-guitar-avatar');
+    const testBass = document.getElementById('test-bass-avatar');
+    const testVocals = document.getElementById('test-vocals-avatar');
+    const testPiano = document.getElementById('test-piano-avatar');
+    const testStrings = document.getElementById('test-strings-avatar');
+
+    testDrums?.addEventListener('click', () => {
+      if (this.visualizer) {
+        const avatarManager = (this.visualizer as any).getAvatarManager?.();
+        if (avatarManager) {
+          avatarManager.triggerAvatarEffect('drums', 0.8);
+        }
+      }
+    });
+
+    testGuitar?.addEventListener('click', () => {
+      if (this.visualizer) {
+        const avatarManager = (this.visualizer as any).getAvatarManager?.();
+        if (avatarManager) {
+          avatarManager.triggerAvatarEffect('guitar', 0.8);
+        }
+      }
+    });
+
+    testBass?.addEventListener('click', () => {
+      if (this.visualizer) {
+        const avatarManager = (this.visualizer as any).getAvatarManager?.();
+        if (avatarManager) {
+          avatarManager.triggerAvatarEffect('bass', 0.8);
+        }
+      }
+    });
+
+    testVocals?.addEventListener('click', () => {
+      if (this.visualizer) {
+        const avatarManager = (this.visualizer as any).getAvatarManager?.();
+        if (avatarManager) {
+          avatarManager.triggerAvatarEffect('vocals', 0.8);
+        }
+      }
+    });
+
+    testPiano?.addEventListener('click', () => {
+      if (this.visualizer) {
+        const avatarManager = (this.visualizer as any).getAvatarManager?.();
+        if (avatarManager) {
+          avatarManager.triggerAvatarEffect('piano', 0.8);
+        }
+      }
+    });
+
+    testStrings?.addEventListener('click', () => {
+      if (this.visualizer) {
+        const avatarManager = (this.visualizer as any).getAvatarManager?.();
+        if (avatarManager) {
+          avatarManager.triggerAvatarEffect('strings', 0.8);
+        }
+      }
+    });
+
+    console.log('Avatar controls setup complete');
+  }
+
   private setupSmartUIHiding(): void {
     console.log('Setting up smart UI auto-hiding...');
 
@@ -1434,6 +1724,11 @@ class MusicVisualizerRenderer {
         id: 'cosmic-effects-panel',
         pinButtonId: 'cosmic-effects-pin',
         triggerArea: { right: 0, bottom: 0, width: 320, height: 450 }
+      },
+      {
+        id: 'avatar-controls-panel',
+        pinButtonId: 'avatar-controls-pin',
+        triggerArea: { right: 0, bottom: 350, width: 320, height: 250 }
       }
     ];
 
