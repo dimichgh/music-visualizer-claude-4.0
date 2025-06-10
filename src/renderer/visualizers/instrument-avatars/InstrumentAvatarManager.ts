@@ -69,8 +69,8 @@ export class InstrumentAvatarManager {
     bass: { heightLevel: -1, radiusMultiplier: 1.1, rotationOffset: Math.PI / 3 },
     guitar: { heightLevel: 0, radiusMultiplier: 1.0, rotationOffset: Math.PI / 6 },
     vocals: { heightLevel: 2, radiusMultiplier: 0.9, rotationOffset: Math.PI / 2 },
-    piano: { heightLevel: 1, radiusMultiplier: 1.05, rotationOffset: Math.PI * 2 / 3 },
-    strings: { heightLevel: 0.5, radiusMultiplier: 0.95, rotationOffset: Math.PI * 5 / 6 }
+    piano: { heightLevel: 1, radiusMultiplier: 1.05, rotationOffset: (Math.PI * 2) / 3 },
+    strings: { heightLevel: 0.5, radiusMultiplier: 0.95, rotationOffset: (Math.PI * 5) / 6 },
   };
   
   // Performance tracking
@@ -146,7 +146,10 @@ export class InstrumentAvatarManager {
   }
 
   public updateAudioFeatures(audioFeatures: AudioFeatures): void {
-    if (!this.config.masterEnabled) return;
+    if (!this.config.masterEnabled) {
+      console.log('🎭 Avatar Manager: DISABLED - masterEnabled = false');
+      return;
+    }
 
     this.frameCount++;
     const now = performance.now();
@@ -154,9 +157,22 @@ export class InstrumentAvatarManager {
     this.lastUpdateTime = now;
     this.currentTime += deltaTime * 0.001; // Convert to seconds
 
+    // COMPREHENSIVE DEBUGGING
+    console.log('🎭 Avatar Manager - Audio Update:', {
+      overallLevel: audioFeatures.overallLevel?.toFixed(3) || 'undefined',
+      bassLevel: audioFeatures.bassLevel?.toFixed(3) || 'undefined',
+      midLevel: audioFeatures.midLevel?.toFixed(3) || 'undefined',
+      trebleLevel: audioFeatures.trebleLevel?.toFixed(3) || 'undefined',
+      hasInstrumentDetection: !!audioFeatures.instrumentDetection,
+      instrumentData: audioFeatures.instrumentDetection
+    });
+
     // Update each avatar with instrument detection data
     if (audioFeatures.instrumentDetection) {
+      console.log('🎭 Updating instrument avatars with detection data...');
       this.updateInstrumentAvatars(audioFeatures, deltaTime);
+    } else {
+      console.warn('🎭 NO INSTRUMENT DETECTION DATA FOUND!');
     }
 
     // Update global positioning and movement
@@ -277,12 +293,20 @@ export class InstrumentAvatarManager {
   public updateConfiguration(newConfig: Partial<InstrumentAvatarsConfig>): void {
     this.config = { ...this.config, ...newConfig };
     
-    console.log('InstrumentAvatarManager: Configuration updated');
+    console.log('🎭 Configuration updated:', {
+      masterEnabled: this.config.masterEnabled,
+      globalOpacity: (this.config.globalOpacity * 100).toFixed(0) + '%',
+      movementSpeed: (this.config.movementSpeed * 100).toFixed(0) + '%'
+    });
     
-    // Apply configuration changes to avatars
-    if (newConfig.masterEnabled !== undefined) {
+    // IMPORTANT: Don't force avatars visible here! Let them manage their own visibility based on confidence
+    // The previous code was calling setVisible(true) which bypassed confidence-based visibility
+    
+    // Only hide all avatars if master is explicitly disabled
+    if (newConfig.masterEnabled === false) {
+      console.log('🎭 Master disabled - hiding all avatars');
       this.avatars.forEach(avatar => {
-        avatar.setVisible(newConfig.masterEnabled!);
+        avatar.setVisible(false);
       });
     }
 
@@ -291,6 +315,10 @@ export class InstrumentAvatarManager {
       Object.entries(newConfig.avatars).forEach(([name, config]) => {
         const avatar = this.avatars.get(name);
         if (avatar && config) {
+          console.log(`🎭 Updating ${name} config:`, {
+            enabled: config.enabled,
+            opacity: (config.opacity * 100).toFixed(0) + '%'
+          });
           avatar.updateConfiguration(config);
         }
       });
@@ -299,9 +327,43 @@ export class InstrumentAvatarManager {
 
   public triggerAvatarEffect(instrumentName: string, intensity: number = 0.8): void {
     const avatar = this.avatars.get(instrumentName);
-    if (avatar) {
+    const avatarConfig = this.config.avatars[instrumentName as keyof typeof this.config.avatars];
+    
+    if (avatar && avatarConfig) {
+      // Calculate proper opacity based on configuration
+      const effectiveConfidence = intensity * avatarConfig.opacity * this.config.globalOpacity;
+      
+      console.log(`🎭 Triggering ${instrumentName} avatar:`, {
+        intensity: (intensity * 100).toFixed(0) + '%',
+        configOpacity: (avatarConfig.opacity * 100).toFixed(0) + '%',
+        globalOpacity: (this.config.globalOpacity * 100).toFixed(0) + '%',
+        effectiveConfidence: (effectiveConfidence * 100).toFixed(0) + '%'
+      });
+      
+      // Update avatar with proper audio data structure
+      avatar.updateWithAudio({
+        confidence: effectiveConfidence,
+        audioFeatures: {
+          bassLevel: 0.5,
+          midLevel: 0.5,
+          trebleLevel: 0.5,
+          overallLevel: intensity,
+          beatDetected: true,
+          tempo: 120,
+          dominantFrequency: 440
+        },
+        deltaTime: 16.67,
+        beatDetected: true,
+        intensity: intensity,
+        config: avatarConfig
+      });
+      
+      // Also trigger special effects
       avatar.triggerSpecialEffect(intensity);
-      console.log(`🎭 Triggered ${instrumentName} avatar effect (intensity: ${(intensity * 100).toFixed(0)}%)`);
+      
+      console.log(`🎭 ${instrumentName} avatar triggered successfully!`);
+    } else {
+      console.warn(`🎭 Failed to trigger ${instrumentName}: avatar or config not found`);
     }
   }
 

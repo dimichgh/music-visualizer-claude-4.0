@@ -152,55 +152,69 @@ class MusicVisualizerRenderer {
       };
     }
 
-    // **DRUMS DETECTION** - Much easier: ANY bass activity OR beat detection
+    // **BALANCED INSTRUMENT DETECTION** - Equal sensitivity and multipliers
+    
+    // **DRUMS DETECTION** - REDUCED bias: Lower multiplier, less beat bonus
     let drumsConfidence = 0;
-    if (bassLevel > 0.05 || beatDetected) {  // ← MUCH LOWER: was 0.3, now 0.05
-      drumsConfidence = Math.min(1.0, bassLevel * 5.0 + (beatDetected ? 0.4 : 0));
-      drumsConfidence *= (0.8 + Math.sin(Date.now() * 0.003) * 0.2);
+    if (bassLevel > 0.05 || beatDetected) {
+      drumsConfidence = Math.min(1.0, bassLevel * 3.0 + (beatDetected ? 0.2 : 0)); // ← REDUCED: was 5.0 + 0.4
+      drumsConfidence *= (0.7 + Math.sin(Date.now() * 0.003) * 0.3);
     }
 
-    // **BASS DETECTION** - Much easier: Low frequencies OR strong bass
+    // **BASS DETECTION** - REDUCED bias: Lower multiplier
     let bassConfidence = 0;
-    if (dominantFrequency < 300 || bassLevel > 0.08) {  // ← MUCH LOWER: was 0.2, now 0.08
-      bassConfidence = Math.min(1.0, bassLevel * 6.0);
+    if (dominantFrequency < 300 || bassLevel > 0.08) {
+      bassConfidence = Math.min(1.0, bassLevel * 4.0); // ← REDUCED: was 6.0
       bassConfidence *= (0.7 + Math.sin(Date.now() * 0.002) * 0.3);
     }
 
-    // **GUITAR DETECTION** - Much easier: Any mid activity
+    // **GUITAR DETECTION** - INCREASED sensitivity: Better multipliers
     let guitarConfidence = 0;
-    if (midLevel > 0.06) {  // ← MUCH LOWER: was 0.2, now 0.06
-      guitarConfidence = Math.min(1.0, midLevel * 4.0 + trebleLevel * 2.0);
-      guitarConfidence *= (0.6 + Math.sin(Date.now() * 0.0025) * 0.4);
+    if (midLevel > 0.04 || trebleLevel > 0.02) { // ← EASIER: lowered thresholds
+      guitarConfidence = Math.min(1.0, midLevel * 5.0 + trebleLevel * 3.0); // ← INCREASED: was 4.0 + 2.0
+      guitarConfidence *= (0.7 + Math.sin(Date.now() * 0.0025) * 0.3); // ← INCREASED base from 0.6
     }
 
-    // **VOCALS DETECTION** - Much easier: Any mid-high activity
+    // **VOCALS DETECTION** - INCREASED sensitivity: Better multipliers
     let vocalsConfidence = 0;
-    if (midLevel > 0.05 || trebleLevel > 0.03) {  // ← MUCH LOWER: was 0.15, now 0.05
-      vocalsConfidence = Math.min(1.0, midLevel * 3.0 + trebleLevel * 4.0);
-      vocalsConfidence *= (0.5 + Math.sin(Date.now() * 0.004) * 0.5);
+    if (midLevel > 0.04 || trebleLevel > 0.02) { // ← EASIER: lowered thresholds  
+      vocalsConfidence = Math.min(1.0, midLevel * 4.0 + trebleLevel * 5.0); // ← INCREASED: was 3.0 + 4.0
+      vocalsConfidence *= (0.7 + Math.sin(Date.now() * 0.004) * 0.3); // ← INCREASED base from 0.5
     }
 
-    // **PIANO DETECTION** - Much easier: Any harmonic content
+    // **PIANO DETECTION** - INCREASED sensitivity: Better calculation
     let pianoConfidence = 0;
-    if (midLevel > 0.05 || trebleLevel > 0.03) {  // ← MUCH LOWER: was 0.2 & 0.1, now 0.05 & 0.03
-      // Simplified harmonic calculation
-      let harmonicRichness = (bassLevel + midLevel + trebleLevel) / 3;
-      pianoConfidence = Math.min(1.0, harmonicRichness * 4.0 + midLevel * 2.0);
-      pianoConfidence *= (0.6 + Math.sin(Date.now() * 0.0015) * 0.4);
+    if (midLevel > 0.04 || trebleLevel > 0.02) { // ← EASIER: lowered thresholds
+      // Improved harmonic calculation favoring piano characteristics
+      let harmonicRichness = (bassLevel + midLevel * 2 + trebleLevel) / 4; // ← BETTER: weight mid frequencies
+      pianoConfidence = Math.min(1.0, harmonicRichness * 5.0 + midLevel * 3.0); // ← INCREASED: was 4.0 + 2.0
+      pianoConfidence *= (0.7 + Math.sin(Date.now() * 0.0015) * 0.3); // ← INCREASED base from 0.6
     }
 
-    // **STRINGS DETECTION** - Much easier: Any sustained mid frequencies  
+    // **STRINGS DETECTION** - INCREASED sensitivity: Much better detection
     let stringsConfidence = 0;
-    if (midLevel > 0.04) {  // ← MUCH LOWER: was 0.15, now 0.04
-      stringsConfidence = Math.min(1.0, midLevel * 5.0 + trebleLevel * 3.0);
-      stringsConfidence *= (0.5 + Math.sin(Date.now() * 0.001) * 0.5);
+    if (midLevel > 0.03 || trebleLevel > 0.02) { // ← EASIER: lowered thresholds significantly
+      stringsConfidence = Math.min(1.0, midLevel * 6.0 + trebleLevel * 4.0); // ← INCREASED: was 5.0 + 3.0
+      stringsConfidence *= (0.7 + Math.sin(Date.now() * 0.001) * 0.3); // ← INCREASED base from 0.5
     }
 
     // Apply minimum threshold and add some randomness for realism
     const minThreshold = 0.05;
     const randomFactor = 0.9 + Math.random() * 0.2; // ±10% randomness
 
-    return {
+    // COMPREHENSIVE DETECTION DEBUGGING
+    console.log('🎵 INSTRUMENT DETECTION DEBUG - Raw Confidences:', {
+      drums: drumsConfidence.toFixed(4),
+      guitar: guitarConfidence.toFixed(4),
+      bass: bassConfidence.toFixed(4),
+      vocals: vocalsConfidence.toFixed(4),
+      piano: pianoConfidence.toFixed(4),
+      strings: stringsConfidence.toFixed(4),
+      minThreshold: minThreshold.toFixed(4),
+      randomFactor: randomFactor.toFixed(3)
+    });
+
+    const result = {
       drums: Math.max(0, drumsConfidence - minThreshold) * randomFactor,
       guitar: Math.max(0, guitarConfidence - minThreshold) * randomFactor,
       bass: Math.max(0, bassConfidence - minThreshold) * randomFactor,
@@ -208,6 +222,18 @@ class MusicVisualizerRenderer {
       piano: Math.max(0, pianoConfidence - minThreshold) * randomFactor,
       strings: Math.max(0, stringsConfidence - minThreshold) * randomFactor
     };
+
+    console.log('🎵 INSTRUMENT DETECTION DEBUG - Final Results:', {
+      drums: result.drums.toFixed(4),
+      guitar: result.guitar.toFixed(4),
+      bass: result.bass.toFixed(4),
+      vocals: result.vocals.toFixed(4),
+      piano: result.piano.toFixed(4),
+      strings: result.strings.toFixed(4),
+      anyDetected: Object.values(result).some(v => v > 0.01)
+    });
+
+    return result;
   }
 
   private extractBasicFeatures(timeData: Float32Array, frequencyData: Float32Array): any {
@@ -254,6 +280,16 @@ class MusicVisualizerRenderer {
 
     // **REALISTIC INSTRUMENT DETECTION SIMULATION**
     // Based on frequency content and energy patterns
+    console.log('🎵 AUDIO PIPELINE DEBUG - Input Levels:', {
+      bassLevel: bassLevel.toFixed(4),
+      midLevel: midLevel.toFixed(4),
+      trebleLevel: trebleLevel.toFixed(4),
+      overallLevel: overallLevel.toFixed(4),
+      dominantFrequency: dominantFrequency.toFixed(0),
+      beatDetected,
+      amplitudeRange: `${Math.min(...linearAmplitudes).toFixed(4)} - ${Math.max(...linearAmplitudes).toFixed(4)}`
+    });
+    
     const instrumentDetection = this.simulateInstrumentDetection({
       bassLevel,
       midLevel, 
@@ -263,6 +299,31 @@ class MusicVisualizerRenderer {
       beatDetected,
       linearAmplitudes
     });
+    
+    console.log('🎵 AUDIO PIPELINE DEBUG - Instrument Detection Result:', instrumentDetection);
+
+    // BALANCED BOOSTING: Equal treatment for all instruments when overall level is reasonable
+    let finalInstrumentDetection = instrumentDetection;
+    if (overallLevel > 0.01) {
+      // Much more balanced - all instruments get similar baseline boost
+      const baseBoost = overallLevel * 0.5; // Base boost for all instruments
+      finalInstrumentDetection = {
+        drums: Math.max(instrumentDetection.drums, baseBoost + overallLevel * 0.1), // Total: 0.6
+        guitar: Math.max(instrumentDetection.guitar, baseBoost + overallLevel * 0.1), // Total: 0.6
+        bass: Math.max(instrumentDetection.bass, baseBoost + overallLevel * 0.05), // Total: 0.55
+        vocals: Math.max(instrumentDetection.vocals, baseBoost + overallLevel * 0.1), // Total: 0.6
+        piano: Math.max(instrumentDetection.piano, baseBoost + overallLevel * 0.1), // Total: 0.6
+        strings: Math.max(instrumentDetection.strings, baseBoost + overallLevel * 0.1) // Total: 0.6
+      };
+      console.log('🎵 BALANCED BOOSTING - Equal opportunity for all instruments:', {
+        drums: finalInstrumentDetection.drums.toFixed(3),
+        guitar: finalInstrumentDetection.guitar.toFixed(3), 
+        bass: finalInstrumentDetection.bass.toFixed(3),
+        vocals: finalInstrumentDetection.vocals.toFixed(3),
+        piano: finalInstrumentDetection.piano.toFixed(3),
+        strings: finalInstrumentDetection.strings.toFixed(3)
+      });
+    }
 
     return {
       bassLevel: Math.min(1.0, bassLevel * 5),
@@ -272,7 +333,7 @@ class MusicVisualizerRenderer {
       beatDetected,
       tempo,
       dominantFrequency,
-      instrumentDetection // ← ADD INSTRUMENT DETECTION DATA
+      instrumentDetection: finalInstrumentDetection // ← ADD BOOSTED INSTRUMENT DETECTION DATA
     };
   }
 
